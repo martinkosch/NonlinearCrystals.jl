@@ -30,10 +30,11 @@ function create_cga()
         T_ref=293u"K",
     )
 
-    d = [0 0 0 235.0 0 0;
-        0 0 0 0 235.0 0;
-        0 0 0 0 0 235.0] * 1u"pm/V"
-
+    # d = [0 0 0 235.0 0 0;
+    #     0 0 0 0 235.0 0;
+    #     0 0 0 0 0 235.0] * 1u"pm/V"
+    d = construct_d_tensor(metadata[:pointgroup]; d14=235.0u"pm/V") 
+        
     CGA = UnidirectionalCrystal(
         metadata,
         n_o_principal,

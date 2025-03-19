@@ -12,91 +12,55 @@ end
 
 calc_k_dir(θ, ϕ) = angles_to_vector(θ, ϕ)
 
-function construct_d_tensor(pointgroup::String; kwargs...)
-    d = zeros(3, 6) * u"pm/V"
+function tensor_indices(comp::Symbol)
+    s = string(comp)
+    length(s) == 3 && s[1] == 'd' || error("Invalid tensor component symbol: $comp")
+    i = parse(Int, s[2])
+    j = parse(Int, s[3])
+    (i, j)
+end
 
-    if pointgroup == "-43m"
-        # Allowed coefficients
-        expected_keys = [:d14]
-        @assert all(sort(collect(keys(kwargs))) .== sort(expected_keys)) "For '-43m', only the following keyword must be provided: $(expected_keys)"
+function construct_d_tensor(pointgroup::String, use_kleinman::Bool=true; components...)
+    comps = [c[1] for c in components]
+    vals = [c[2] for c in components]
+    sg = use_kleinman ? symmetry_groups_kleinman : symmetry_groups
 
-        d14 = kwargs[:d14]
-        d[1, 4] = d14  # d_x_yz
-        d[2, 5] = d14  # d_y_xz
-        d[3, 6] = d14  # d_z_xy
+    symmetry = get(sg, pointgroup, nothing)
+    symmetry !== nothing || error("Point group '$pointgroup' not defined.")
 
-    elseif pointgroup == "3m"
-        expected_keys = [:d31, :d33, :d22, :d15]
-        # d15 may be zero or optional, but it is exptected to be explicitly provided
-        @assert all(sort(collect(keys(kwargs))) .== sort(expected_keys)) "For '3m', keywords required: $(expected_keys)"
+    # Iterate through each symmetry group to ensure consistency
+    d_res = zeros(3, 6) * u"pm/V"
+    for group in symmetry
+        group_comps, group_signs = group
+        given_group_comps = intersect(Set(group_comps), Set(comps))
 
-        d31 = kwargs[:d31]
-        d33 = kwargs[:d33]
-        d22 = kwargs[:d22]
-        d15 = kwargs[:d15]
-        d[1, 5] = d15       # d_x_xz
-        d[1, 6] = -d22      # d_x_xy
-        d[2, 1] = -d22      # d_y_xx
-        d[2, 2] = d22       # d_y_yy
-        d[2, 6] = d15       # d_y_xy
-        d[3, 1] = d31       # d_z_xx
-        d[3, 2] = d31       # d_z_yy
-        d[3, 3] = d33       # d_z_zz
+        if length(given_group_comps) > 1
+            @error "Exactly one of the following components must be specified: $(group_comps)"
+        elseif length(given_group_comps) < 1
+            if length(group_comps) == 1
+                @error "Component '$(group_comps[1])' must be specified."
+            else
+                @error "One of these components must be specified: $(group_comps)"
+            end
+        end
 
-    elseif pointgroup == "mm2"
-        expected_keys = [:d15, :d24, :d31, :d32, :d33]
-        @assert all(sort(collect(keys(kwargs))) .== sort(expected_keys)) "For 'mm2', keywords required: $(expected_keys)"
+        # Correct signs within the current symmetry group
+        given_group_comp = collect(given_group_comps)[1]
+        idx = findall(c -> (c === given_group_comp), group_comps)[1]
+        group_signs_switched = group_signs[idx] == 1 ? group_signs : -group_signs
 
-        d[1, 5] = kwargs[:d15]   # d_x_xz
-        d[2, 4] = kwargs[:d24]   # d_y_yz
-        d[3, 1] = kwargs[:d31]   # d_z_xx
-        d[3, 2] = kwargs[:d32]   # d_z_yy
-        d[3, 3] = kwargs[:d33]   # d_z_zz
-
-    elseif pointgroup == "4mm"
-        expected_keys = [:d15, :d31, :d33]
-        @assert all(sort(collect(keys(kwargs))) .== sort(expected_keys)) "For '4mm', keywords required: $(expected_keys)"
-
-        d15 = kwargs[:d15]
-        d31 = kwargs[:d31]
-        d33 = kwargs[:d33]
-        d[1, 5] = d15      # d_x_xz
-        d[2, 4] = d15      # d_y_yz
-        d[3, 1] = d31      # d_z_xx
-        d[3, 2] = d31      # d_z_yy
-        d[3, 3] = d33      # d_z_zz
-
-    elseif pointgroup == "32"
-        expected_keys = [:d11]
-        @assert all(sort(collect(keys(kwargs))) .== sort(expected_keys)) "For '32', keyword required: $(expected_keys)"
-
-        d11 = kwargs[:d11]
-        d[1, 1] = -d11     # d_x_xx
-        d[1, 2] = d11      # d_x_yy
-        d[2, 6] = -d11     # d_y_xy
-
-    elseif pointgroup == "6mm"
-        expected_keys = [:d11]
-        @assert all(sort(collect(keys(kwargs))) .== sort(expected_keys)) "For '6mm', keyword required: $(expected_keys)"
-
-        d11 = kwargs[:d11]
-        d[1, 6] = -d11     # d_x_xy
-        d[2, 1] = -d11     # d_y_xx
-        d[2, 2] = d11      # d_y_yy
-
-    elseif pointgroup == "m-3m"
-        @assert isempty(kwargs) "For centrosymmetric 'm-3m', no nonlinear coefficients allowed!"
-
-    else
-        error("Unsupported or unknown point group: $pointgroup")
+        # Set all group components based on the given component with the correct sign relations
+        c_idx = findall(c -> (c === given_group_comp), comps)[1]
+        for (gc, gs) in zip(group_comps, group_signs_switched)
+            d_res[tensor_indices(gc)...] = vals[c_idx] * gs
+        end
     end
 
-    return d
+    return d_res
 end
 
 function calc_d_eff(cr::NonlinearCrystal, E_dir_r1::AbstractVector{<:Real}, E_dir_r2::AbstractVector{<:Real}, E_dir_b::AbstractVector{<:Real})
-    # Build contracted input combinations:
-    P = [
+    P_dir_b = [
         E_dir_r1[1] * E_dir_r2[1],                             # xx
         E_dir_r1[2] * E_dir_r2[2],                             # yy
         E_dir_r1[3] * E_dir_r2[3],                             # zz
@@ -105,8 +69,7 @@ function calc_d_eff(cr::NonlinearCrystal, E_dir_r1::AbstractVector{<:Real}, E_di
         E_dir_r1[1] * E_dir_r2[2] + E_dir_r1[2] * E_dir_r2[1]  # xy + yx
     ]
 
-    # Contract with blue beam polarization:
-    return dot(E_dir_b, cr.d * P)
+    return dot(E_dir_b, cr.d * P_dir_b)
 end
 
 
@@ -176,6 +139,7 @@ function optical_axis_angle(
     ny = refractive_index(cr.n_y_principal, λ, T)
     nz = refractive_index(cr.n_z_principal, λ, T)
 
+    # TODO: Clean up using matrix notation
     if nx < nz
         Vz = asin((nz * sqrt(ny^2 - nx^2)) / (ny * sqrt(nz^2 - nx^2)))
     else
@@ -215,7 +179,7 @@ function refraction_data_hi_lo(
     # Assign ordinary or extraordinary direction labels to the calculated hi and lo direction in case of unidirectional crystal
     o_or_e_hi_lo = assign_e_o(E_dir_hi_lo)
 
-    #Calculate derivative based data
+    # Calculate derivative based data
     group_index_hi_lo = calc_group_index_hi_lo(θ, ϕ, cr, λ, T)
     β0_hi_lo = calc_β0_hi_lo(θ, ϕ, cr, λ, T)
     β1_hi_lo = calc_β1_hi_lo(θ, ϕ, cr, λ, T)
@@ -240,22 +204,25 @@ function calc_k_dir_ε_tensor_n_xyz(
     nz = refractive_index(cr.n_z_principal, λ, T)
 
     k_dir = calc_k_dir(θ, ϕ)
-    ε_tensor = Diagonal(@SVector [nx^2, ny^2, nz^2])
+    ε_tensor = Diagonal(@SVector [1 / nx^2, 1 / ny^2, 1 / nz^2])
 
     return k_dir, ε_tensor, (nx, ny, nz)
 end
 
-function calc_n_hi_lo_D_dir_hi_lo(k::AbstractVector{<:Real}, ε_tensor::AbstractMatrix{<:Real})
-    P = I - k * k'
-    ε_proj = P * ε_tensor * P
+function calc_n_hi_lo_D_dir_hi_lo(k_dir::AbstractVector{<:Real}, ε_tensor::AbstractMatrix{<:Real})
+    # Construct numerically stable coordinate system around k   
+    smallest_axis = findmin(k_dir)[2]
+    k_orth1 = normalize(cross(k_dir, [i == smallest_axis ? 1.0 : 0.0 for i in 1:3]))
+    k_orth2 = normalize(cross(k_dir, k_orth1))
+    P_k_orth = [k_orth1 k_orth2]
 
-    # Use special native Julia eigen function to allow differentiation with ForwardDiff.jl
-    eigs = DifferentiableEigen.eigen(ε_proj)
-    eigvals = eigs[1][1:2:end]
-    eigvecs = reshape(eigs[2][1:2:end], size(ε_proj))
-    idx = sortperm(eigvals, rev=true)
+    # Search for eigenvalues and vectors in the reduced P_k_orth 2D space
+    ε_proj = P_k_orth' * ε_tensor * P_k_orth
+    eigvals, eigvecs_orth = eigen_2d(ε_proj')
+    eigvecs = P_k_orth * eigvecs_orth
 
-    n_hi_lo = (sqrt(abs(eigvals[idx[1]])), sqrt(abs(eigvals[idx[2]])))
+    idx = sortperm(eigvals, rev=false)
+    n_hi_lo = (1 / sqrt(eigvals[idx[1]]), 1 / sqrt(eigvals[idx[2]]))
     D_dir_hi_lo = (eigvecs[:, idx[1]], eigvecs[:, idx[2]])
     return n_hi_lo, D_dir_hi_lo
 end
@@ -309,15 +276,12 @@ function calc_β1_hi_lo(θ, ϕ, cr::NonlinearCrystal, λ::Unitful.Length=default
     ϕ = ϕ |> u"rad"
     ω_in = 2π * c_0 / λ
 
-    sn = ω_in * 1e-3
-    return (calc_β0_hi_lo(θ, ϕ, cr, 2π * c_0 / (ω_in + sn), T) .- calc_β0_hi_lo(θ, ϕ, cr, 2π * c_0 / (ω_in - sn), T)) ./ (2 * sn)
-
-    # fun = ω -> [ustrip(d) for d in calc_β0_hi_lo(θ, ϕ, cr, uconvert(u"m", 2π * c_0 / ω * 1u"s"), T)]
-    # return Tuple(
-    #     ForwardDiff.derivative(
-    #         fun,
-    #         ustrip(ω_in |> u"s^-1")
-    #     ) * 1u"s/m")
+    fun = ω -> [ustrip(d) for d in calc_β0_hi_lo(θ, ϕ, cr, uconvert(u"m", 2π * c_0 / ω * 1u"s"), T)]
+    return Tuple(
+        ForwardDiff.derivative(
+            fun,
+            ustrip(ω_in |> u"s^-1")
+        ) * 1u"s/m")
 end
 calc_β1_hi_lo(θ, cr::UnidirectionalCrystal, args...; kwargs...) = calc_β1_hi_lo(θ, 0.0u"rad", cr, args...; kwargs...)
 
@@ -327,15 +291,12 @@ function calc_β2_hi_lo(θ, ϕ, cr::NonlinearCrystal, λ::Unitful.Length=default
     ϕ = ϕ |> u"rad"
     ω_in = 2π * c_0 / λ
 
-    sn = ω_in * 1e-3
-    (calc_β1_hi_lo(θ, ϕ, cr, 2π * c_0 / (ω_in + sn), T) .- calc_β1_hi_lo(θ, ϕ, cr, 2π * c_0 / (ω_in - sn), T)) ./ (2 * sn)
-
-    # fun = ω -> [ustrip(d) for d in calc_β1_hi_lo(θ, ϕ, cr, uconvert(u"m", 2π * c_0 / ω * 1u"s"), T)]
-    # return Tuple(
-    #     ForwardDiff.derivative(
-    #         fun,
-    #         ustrip(ω_in |> u"s^-1")
-    #     ) * 1u"s^2/m")
+    fun = ω -> [ustrip(d) for d in calc_β1_hi_lo(θ, ϕ, cr, uconvert(u"m", 2π * c_0 / ω * 1u"s"), T)]
+    return Tuple(
+        ForwardDiff.derivative(
+            fun,
+            ustrip(ω_in |> u"s^-1")
+        ) * 1u"s^2/m")
 end
 calc_β2_hi_lo(θ, cr::UnidirectionalCrystal, args...; kwargs...) = calc_β2_hi_lo(θ, 0.0u"rad", cr, args...; kwargs...)
 
@@ -345,15 +306,12 @@ function calc_β3_hi_lo(θ, ϕ, cr::NonlinearCrystal, λ::Unitful.Length=default
     ϕ = ϕ |> u"rad"
     ω_in = 2π * c_0 / λ
 
-    sn = ω_in * 1e-3
-    (calc_β2_hi_lo(θ, ϕ, cr, 2π * c_0 / (ω_in + sn), T) .- calc_β2_hi_lo(θ, ϕ, cr, 2π * c_0 / (ω_in - sn), T)) ./ (2 * sn)
-
-    # fun = ω -> [ustrip(d) for d in calc_β2_hi_lo(θ, ϕ, cr, uconvert(u"m", 2π * c_0 / ω * 1u"s"), T)]
-    # return Tuple(
-    #     ForwardDiff.derivative(
-    #         fun,
-    #         ustrip(ω_in |> u"s^-1")
-    #     ) * 1u"s^3/m")
+    fun = ω -> [ustrip(d) for d in calc_β2_hi_lo(θ, ϕ, cr, uconvert(u"m", 2π * c_0 / ω * 1u"s"), T)]
+    return Tuple(
+        ForwardDiff.derivative(
+            fun,
+            ustrip(ω_in |> u"s^-1")
+        ) * 1u"s^3/m")
 end
 calc_β3_hi_lo(θ, cr::UnidirectionalCrystal, args...; kwargs...) = calc_β3_hi_lo(θ, 0.0u"rad", cr, args...; kwargs...)
 
@@ -367,7 +325,7 @@ calc_group_index_hi_lo(θ, cr::UnidirectionalCrystal, args...; kwargs...) = calc
 function plot_birefringent_refraction(
     θ,
     ϕ,
-    cr::BidirectionalCrystal,
+    cr::NonlinearCrystal,
     λ::Unitful.Length=default_λ(cr),
     T::Unitful.Temperature=default_T(cr);
 )

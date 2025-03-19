@@ -8,11 +8,11 @@ using GLMakie
 using GeometryBasics
 
 import ForwardDiff
-import DifferentiableEigen
 import PhysicalConstants.CODATA2022: c_0
 
 include("utils.jl")
 include("refractive_index.jl")
+include("crystal_symmetry.jl")
 include("crystals.jl")
 include("phasematch.jl")
 

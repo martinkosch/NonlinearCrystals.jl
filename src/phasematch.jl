@@ -1,8 +1,8 @@
-export PhaseMatch, CollinearPhaseMatch, phase_match_wavelengths, find_phasematches, find_nearest_phase_match, delta_k, plot_delta_k_map
+export PhaseMatch, CollinearPhaseMatch, phase_match_wavelengths, find_noncritical_phasematches, find_phasematches, find_nearest_phase_match, delta_k, plot_delta_k_map
 
 abstract type PhaseMatch end
 
-struct CollinearPhaseMatch{LT,TT,OT,AT,IT,WT,DT,ET,ST,RT,GT,B2T,B3T,FT,CT}
+struct CollinearPhaseMatch{LT,TT,OT,AT,IT,WT,DT,ET,ST,RT,GT,B2T,B3T,FT,CT} <: PhaseMatch
     lambda_r1_r2_b::Vector{<:LT}
     T::TT
     hi_or_lo_r1_r2_b::Vector{Symbol}
@@ -50,6 +50,12 @@ function CollinearPhaseMatch(
     beta_2_r1_r2_b = select_hi_lo([d[10] for d in data_hi_lo])
     beta_3_r1_r2_b = select_hi_lo([d[11] for d in data_hi_lo])
 
+    # Assert that the signs of all field direction vectors (until here chosen randomly) are unified, e.g. all high-index directions point in the same direction 
+    k = angles_to_vector(theta_pm, phi_pm)
+    unified_dir_signs = calc_unified_dir_signs(E_dir_r1_r2_b, k)
+    D_dir_r1_r2_b = unified_dir_signs .* D_dir_r1_r2_b
+    E_dir_r1_r2_b = unified_dir_signs .* E_dir_r1_r2_b
+
     d_eff = calc_d_eff(cr, E_dir_r1_r2_b...)
 
     return CollinearPhaseMatch(
@@ -72,6 +78,21 @@ function CollinearPhaseMatch(
     )
 end
 
+function calc_unified_dir_signs(dir_vecs_r1_r2_b::AbstractVector{<:AbstractVector{<:Number}}, k::AbstractVector{<:Number})
+    sign_b = sign(dir_vecs_r1_r2_b[3][3]) # TODO: Fix sign jumps in d_eff by using a suitable reference axis
+    dir_ref = cross(dir_vecs_r1_r2_b[3], k)
+
+    d_r1_ref = dot(dir_ref, dir_vecs_r1_r2_b[1])
+    d_r1_b = dot(dir_vecs_r1_r2_b[3], dir_vecs_r1_r2_b[1])
+    d_r2_ref = dot(dir_ref, dir_vecs_r1_r2_b[2])
+    d_r2_b = dot(dir_vecs_r1_r2_b[3], dir_vecs_r1_r2_b[2])
+
+    sign_r1 = (abs(d_r1_ref) > abs(d_r1_b)) ? sign(d_r1_ref) : sign(d_r1_b)
+    sign_r2 = (abs(d_r2_ref) > abs(d_r2_b)) ? sign(d_r2_ref) : sign(d_r2_b)
+
+    return [sign_r1, sign_r2, sign_b]
+end
+
 function Base.show(io::IO, cpm::CollinearPhaseMatch)
     digits = 3
     println(io, "Crystal: $(cpm.cr.metadata[:description])")
@@ -89,6 +110,9 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     println(io, "TOD: $(round(u"fs^3/mm", cpm.beta_3_r1_r2_b[1]; digits)), $(round(u"fs^3/mm", cpm.beta_3_r1_r2_b[2]; digits)), $(round(u"fs^3/mm", cpm.beta_3_r1_r2_b[3]; digits))")
     println(io, "d_eff: $(round(u"pm/V", cpm.d_eff; digits))")
     println(io, "E_dir: $(round.(cpm.E_dir_r1_r2_b[1]; digits)), $(round.(cpm.E_dir_r1_r2_b[2]; digits)), $(round.(cpm.E_dir_r1_r2_b[3]; digits))")
+    println(io, "D_dir: $(round.(cpm.D_dir_r1_r2_b[1]; digits)), $(round.(cpm.D_dir_r1_r2_b[2]; digits)), $(round.(cpm.D_dir_r1_r2_b[3]; digits))")
+    println(io, "E_dir_angles: $(round.(u"°", vector_to_angles(cpm.E_dir_r1_r2_b[1]); digits)), $(round.(u"°", vector_to_angles(cpm.E_dir_r1_r2_b[2]); digits)), $(round.(u"°", vector_to_angles(cpm.E_dir_r1_r2_b[3]); digits))")
+    println(io, "D_dir_angles: $(round.(u"°", vector_to_angles(cpm.D_dir_r1_r2_b[1]); digits)), $(round.(u"°", vector_to_angles(cpm.D_dir_r1_r2_b[2]); digits)), $(round.(u"°", vector_to_angles(cpm.D_dir_r1_r2_b[3]); digits))")
 end
 
 function phase_match_wavelengths(;
@@ -151,6 +175,45 @@ function delta_k(cpm::CollinearPhaseMatch)
     return delta_k(cpm.theta_pm, cpm.phi_pm, cpm.hi_or_lo_r1_r2_b, cpm.cr; lambda_r1=cpm.lambda_r1_r2_b[1], lambda_r2=cpm.lambda_r1_r2_b[2], lambda_b=cpm.lambda_r1_r2_b[3], cpm.T)
 end
 
+function find_noncritical_phasematches(
+    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    cr::NonlinearCrystal;
+    lambda_r1::Union{Nothing,Unitful.Length}=nothing,
+    lambda_r2::Union{Nothing,Unitful.Length}=nothing,
+    lambda_b::Union{Nothing,Unitful.Length}=nothing,
+    T_min::Unitful.Temperature=293.15u"K",
+    T_max::Unitful.Temperature=600u"K",
+    ngrid=500,
+    tol=1e-6,
+)
+    lambda_r1, lambda_r2, lambda_b = phase_match_wavelengths(; lambda_r1, lambda_r2, lambda_b)
+    lambda_r1_r2_b = [lambda_r1, lambda_r2, lambda_b]
+
+    phasematches = CollinearPhaseMatch[]
+
+    θ_axis_parallel = ([0.0u"°", 90.0u"°"])
+    ϕ_axis_parallel = ([0.0u"°", 90.0u"°"])
+    for θ in θ_axis_parallel
+        for ϕ in ϕ_axis_parallel
+            # Global search over T
+            all_T = range(T_min, T_max, length=ngrid)
+            all_delta_k = [delta_k(θ, ϕ, hi_or_lo_r1_r2_b, cr; T, lambda_r1, lambda_r2, lambda_b) for T in all_T]
+
+            # Find approximate zero-crossings
+            for i in 1:(length(all_T)-1)
+                if ustrip(all_delta_k[i] * all_delta_k[i+1]) < 0  # zero crossing detected
+                    # Refine solution using local optimization
+                    T_sol = find_zero(T -> delta_k(θ, ϕ, hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, T),
+                        (all_T[i], all_T[i+1]), Bisection(), atol=tol)
+                    push!(phasematches, CollinearPhaseMatch(cr, lambda_r1_r2_b, T_sol, hi_or_lo_r1_r2_b, θ, ϕ))
+                end
+            end
+        end
+    end
+
+    return phasematches
+end
+
 function find_phasematches(
     hi_or_lo_r1_r2_b::AbstractVector{Symbol},
     cr::NonlinearCrystal;
@@ -161,7 +224,7 @@ function find_phasematches(
     theta_fixed=nothing,
     phi_fixed=nothing,
     ngrid=500,
-    tol=1e-6
+    tol=1e-6,
 )
     lambda_r1, lambda_r2, lambda_b = phase_match_wavelengths(; lambda_r1, lambda_r2, lambda_b)
     lambda_r1_r2_b = [lambda_r1, lambda_r2, lambda_b]
@@ -202,6 +265,29 @@ function find_phasematches(
     return phasematches
 end
 
+function find_phasematches(
+    cr::NonlinearCrystal;
+    lambda_r1::Union{Nothing,Unitful.Length}=nothing,
+    lambda_r2::Union{Nothing,Unitful.Length}=nothing,
+    lambda_b::Union{Nothing,Unitful.Length}=nothing,
+    T::Unitful.Temperature=default_T(cr),
+    hi_or_lo_r1_r2_b_vec::Union{Nothing,AbstractVector{<:AbstractVector{Symbol}}}=nothing,
+    theta_fixed=nothing,
+    phi_fixed=nothing,
+    ngrid=500,
+    tol=1e-6,
+)
+    if isnothing(hi_or_lo_r1_r2_b_vec)
+        hi_or_lo_r1_r2_b_vec = bool_permutations(:hi, :lo, 3)
+    end
+
+    all_res = map(hi_or_lo_r1_r2_b_vec) do hi_or_lo_r1_r2_b
+        find_phasematches(hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, T, theta_fixed, phi_fixed, ngrid, tol)
+    end
+
+    return reduce(vcat, all_res)
+end
+
 function find_nearest_phase_match(
     θ_target,
     ϕ_target,
@@ -240,12 +326,11 @@ function plot_delta_k_map(
     lambda_r2::Union{Nothing,Unitful.Length}=nothing,
     lambda_b::Union{Nothing,Unitful.Length}=nothing,
     T::Unitful.Temperature=default_T(cr),
+    phasematches::AbstractVector{<:PhaseMatch}=PhaseMatch[],
     n_points::Integer=100,
     axis_length::Real=1.5,
     digits::Integer=3,
     plot_type::Symbol=:polar,
-    theta_fixed=nothing,
-    phi_fixed=nothing,
     show_coordinates::Bool=true,
     show_optical_axes::Bool=true,
 )
@@ -266,12 +351,6 @@ function plot_delta_k_map(
 
     θ_range, ϕ_range, all_delta_k = compute_delta_k_grid(cr, hi_or_lo_r1_r2_b, lambda_r1_r2_b..., T, n_points)
     scale_limit = maximum(abs.(all_delta_k))
-
-    if !isnothing(phi_fixed) || !isnothing(theta_fixed)
-        phasematches = find_phasematches(hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, T, theta_fixed, phi_fixed)
-    else
-        phasematches = []
-    end
 
     # Generate contours
     cpl = Makie.Contours.contours(ustrip.(θ_range), ustrip.(ϕ_range), all_delta_k, [0.0])
@@ -330,6 +409,20 @@ function plot_delta_k_map(
     else
         error("Plot type $(plot_type) unknown.")
     end
+end
+
+plot_delta_k_map(args...; phasematches::PhaseMatch, kwargs...) = plot_delta_k_map(args...; phasematches=[phasematches], kwargs...)
+
+function plot_delta_k_map(
+    pm::PhaseMatch;
+    n_points::Integer=100,
+    axis_length::Real=1.5,
+    digits::Integer=3,
+    plot_type::Symbol=:polar,
+    show_coordinates::Bool=true,
+    show_optical_axes::Bool=true,
+)
+    return plot_delta_k_map(pm.hi_or_lo_r1_r2_b, pm.cr; lambda_r1=pm.lambda_r1_r2_b[1], lambda_r2=pm.lambda_r1_r2_b[2], lambda_b=pm.lambda_r1_r2_b[3], T=pm.T, phasematches=[pm], n_points, axis_length, digits, plot_type, show_coordinates, show_optical_axes)
 end
 
 function compute_delta_k_grid(

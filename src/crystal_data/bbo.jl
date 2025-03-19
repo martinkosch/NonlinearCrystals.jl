@@ -44,8 +44,11 @@ function create_bbo()
         T_ref=293.15u"K",
     )
 
-    d = construct_d_tensor(metadata[:pointgroup]; d31=0.08u"pm/V", d33=0.0u"pm/V", d22=-2.2u"pm/V", d15=0.08u"pm/V") # TODO: Entry d33 is possibly not right!
-    
+    # d= [0     0    0   0    0.08   2.2;
+    #    2.2  -2.2   0  0.08   0      0;
+    #   0.08  0.08  0   0     0      0] .* u"pm/V"
+    d = construct_d_tensor(metadata[:pointgroup]; d21=2.2u"pm/V", d31=0.08u"pm/V", d33=0.0u"pm/V") # TODO: Entry d33 is possibly not right!
+
     BBO = UnidirectionalCrystal(
         metadata,
         n_o_principal,

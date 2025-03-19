@@ -34,7 +34,11 @@ function create_ktp_h()
         T_ref=293.15u"K",
     )
 
-    d = construct_d_tensor(metadata[:pointgroup]; d15=1.95u"pm/V", d24=3.9u"pm/V", d31=1.95u"pm/V", d32=3.9u"pm/V", d33=15.3u"pm/V")
+    # d = [0     0    0    0   1.95  0;
+    #     0     0    0   3.9   0    0;
+    #    1.95  3.9  15.3  0    0    0] .* u"pm/V"
+    d = construct_d_tensor(metadata[:pointgroup]; d31=1.95u"pm/V", d32=3.9u"pm/V", d33=15.3u"pm/V") 
+
 
     KTP_H = BidirectionalCrystal(
         metadata,

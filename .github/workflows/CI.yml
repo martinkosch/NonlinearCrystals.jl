@@ -24,7 +24,7 @@ jobs:
       matrix:
         version:
           - '1.11'
-          - '1.6'
+        #  - '1.6'
           - 'pre'
         os:
           - ubuntu-latest
@@ -87,6 +87,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: >
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
             cd docs;
             DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
             julia --color=yes make.jl

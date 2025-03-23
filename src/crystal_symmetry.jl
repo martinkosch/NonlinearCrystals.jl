@@ -69,8 +69,8 @@ const symmetry_groups_kleinman = Dict(
         ([:d31, :d32, :d24, :d15], [1, -1, 1, 1]),
         ([:d33], [1]),
     ],
-    "622" => [([],[])],
-    "422" => [([],[])],
+    "622" => [([], [])],
+    "422" => [([], [])],
     "-4" => [
         ([:d31, :d32, :d24, :d15], [1, -1, -1, 1]),
         ([:d14, :d25, :d36], [1, 1, 1]),
@@ -242,9 +242,9 @@ function plot_symmetry(group_name)
         :d21 => (1, 2), :d22 => (2, 2), :d23 => (3, 2), :d24 => (4, 2), :d25 => (5, 2), :d26 => (6, 2),
         :d31 => (1, 1), :d32 => (2, 1), :d33 => (3, 1), :d34 => (4, 1), :d35 => (5, 1), :d36 => (6, 1)
     )
-    
+
     fig = Figure(size=(600, 300))
-    ax = Axis(fig[1,1], title="Class: $group_name")
+    ax = Axis(fig[1, 1], title="Class: $group_name")
 
     # Mark all points as small black dots initially
     for (comp, (x, y)) in coords
@@ -257,13 +257,13 @@ function plot_symmetry(group_name)
     # Helper: draw connections
     function draw_connections(groups, linestyle=:solid; is_kleinman=false)
         for (group, signs) in groups
-            xy = [coords[c] for c in group if haskey(coords,c)]
-            xvals, yvals = getindex.(xy,1), getindex.(xy,2)
+            xy = [coords[c] for c in group if haskey(coords, c)]
+            xvals, yvals = getindex.(xy, 1), getindex.(xy, 2)
 
             # Draw lines
             for i in 1:length(xvals)-1
                 lines!(ax, [xvals[i], xvals[i+1]], [yvals[i], yvals[i+1]],
-                       color=:black, linestyle=linestyle, linewidth=2)
+                    color=:black, linestyle=linestyle, linewidth=2)
             end
 
             # Draw each point
@@ -274,8 +274,8 @@ function plot_symmetry(group_name)
                 size = 16
                 (cx, cy) = coords[comp]
                 scatter!(ax, [cx], [cy],
-                         markersize=size, color=fillcolor, marker=shape,
-                         strokewidth=1.5, strokecolor=:black)
+                    markersize=size, color=fillcolor, marker=shape,
+                    strokewidth=1.5, strokecolor=:black)
             end
         end
     end
@@ -291,16 +291,16 @@ function plot_symmetry(group_name)
     unique_kleinman_groups = setdiff(all_kgroups, main_groups)
     draw_connections(unique_kleinman_groups, :dash; is_kleinman=true)
 
-    # Example legend
-    sym_ls         = LineElement(color=:black, linestyle=:solid, linewidth=2)
-    sym_kleinman   = LineElement(color=:black, linestyle=:dash,  linewidth=2)
-    dot_plus       = MarkerElement(color=:black, marker=:circle, markersize=10)
-    dot_minus      = MarkerElement(color=:white, marker=:circle, strokewidth=1.5, strokecolor=:black, markersize=10)
-    square_zero_k  = MarkerElement(color=:black, marker=:rect,   markersize=10)
+    sym_ls = LineElement(color=:black, linestyle=:solid, linewidth=2)
+    sym_kleinman = LineElement(color=:black, linestyle=:dash, linewidth=2)
+    dot_plus = MarkerElement(color=:black, marker=:circle, markersize=10)
+    dot_minus = MarkerElement(color=:white, marker=:circle, strokewidth=1.5, strokecolor=:black, markersize=10)
+    square_zero_k_plus = MarkerElement(color=:black, marker=:rect, strokecolor=:black, markersize=10)
+    square_zero_k_minus = MarkerElement(color=:white, marker=:rect, strokewidth=1.5, strokecolor=:black, markersize=10)
 
-    Legend(fig[1,2],
-        [sym_ls, sym_kleinman, dot_plus, dot_minus, square_zero_k],
-        ["Always valid", "Kleinman only", "Same sign", "Opposite sign", "Zero under Kleinman"],
+    Legend(fig[1, 2],
+        [sym_ls, sym_kleinman, dot_plus, dot_minus, square_zero_k_plus, square_zero_k_minus],
+        ["Always valid", "Kleinman only", "Same sign", "Opposite sign", "Zero under Kleinman, same sign", "Zero under Kleinman, opposite sign"],
         framevisible=false
     )
 

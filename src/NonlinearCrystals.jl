@@ -8,7 +8,10 @@ using GLMakie
 using GeometryBasics
 
 import ForwardDiff
-import PhysicalConstants.CODATA2022: c_0
+import PhysicalConstants.CODATA2022: c_0, ε_0
+
+import Unitful: Temperature, Length, Frequency
+@derived_dimension Angle  Unitful.𝐋^0  true # Used to force explicit angle units
 
 include("utils.jl")
 include("refractive_index.jl")
@@ -21,5 +24,9 @@ include("crystal_data/bbo.jl")
 include("crystal_data/cga.jl")
 include("crystal_data/ktp_h.jl")
 include("crystal_data/ktp_f.jl")
+include("crystal_data/lbo.jl")
+include("crystal_data/lnb_c.jl")
+# include("crystal_data/lnb_m.jl") # TODO: Add when data is ready
+include("crystal_data/lnb_s.jl")
 
 end

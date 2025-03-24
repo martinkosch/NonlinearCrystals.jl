@@ -81,6 +81,9 @@ jobs:
           using Pkg
           Pkg.develop(PackageSpec(path=pwd()))
           Pkg.instantiate()
+          cd("docs")
+          Pkg.activate(".")
+          Pkg.instantiate()
       - uses: julia-actions/julia-buildpkg@v1
       - name: Build and deploy docs
         env:

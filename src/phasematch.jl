@@ -605,11 +605,151 @@ function noncritical_pm_label(
     return isnothing(pm) ? "" : plot_pm_label(pm)
 end
 
+function calc_raw_noncritical_pm_lines(
+    pricipal_axis::Symbol,
+    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    cr::NonlinearCrystal;
+    lambda_b_min::Union{Nothing,Length}=nothing,
+    lambda_b_max::Union{Nothing,Length}=nothing,
+    lambda_r12_min::Union{Nothing,Length}=nothing,
+    lambda_r12_max::Union{Nothing,Length}=nothing,
+    temp::Temperature=default_temp(cr),
+    ngrid=100,
+)
+    @assert pricipal_axis in [:X, :Y, :Z]
+
+    isnothing(lambda_b_min) && (lambda_b_min = valid_lambda_range(cr)[1])
+    isnothing(lambda_b_max) && (lambda_b_max = valid_lambda_range(cr)[2] / 2)
+    isnothing(lambda_r12_min) && (lambda_r12_min = valid_lambda_range(cr)[1])
+    isnothing(lambda_r12_max) && (lambda_r12_max = valid_lambda_range(cr)[2])
+    range_lambda_b = LinRange(lambda_b_min, lambda_b_max, ngrid) .|> u"µm"
+    range_lambda_r12 = LinRange(lambda_r12_min, lambda_r12_max, ngrid) .|> u"µm"
+    
+    all_delta_k = zeros(length(range_lambda_b), length(range_lambda_r12))
+    for i in CartesianIndices(all_delta_k)
+        (i_b, i_r12) = (i[1], i[2])
+        lambda_b = range_lambda_b[i_b]
+        lambda_r12 = range_lambda_r12[i_r12]
+        lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_b, lambda_r1=lambda_r12)
+        if is_lambda_valid(lambda_r2, cr)
+            all_delta_k[i_b, i_r12] = ustrip(u"m^-1", delta_k(axes_to_θ_ϕ(pricipal_axis)[1]..., hi_or_lo_r1_r2_b, cr; temp, lambda_r1, lambda_r2, lambda_b))
+        else
+            all_delta_k[i_b, i_r12] = NaN
+        end
+    end
+
+    # Extract Δk=0 isolines using Makie contour function
+    cpl = Makie.Contours.contour(range_lambda_b, range_lambda_r12, all_delta_k, 0.0)
+    return cpl # Makie.jl contour object with list of `lines` containing list of `vertices`
+end
+
+function split_and_interpolate(cb::AbstractVector, cr::AbstractVector, sign_switches, fractions, segment_signs)
+    segments_cb = []
+    segments_cr = []
+
+    start_idx = 1
+    cb_intersections = []
+    cr_intersections = []
+    for (switch_idx, frac) in zip(sign_switches, fractions)
+        # Extract current segment (from start_idx to switch_idx)
+        cb_seg = cb[start_idx:switch_idx]
+        cr_seg = cr[start_idx:switch_idx]
+
+        # Interpolate at switch point
+        cb_interp = cb[switch_idx] * (1 - frac) + cb[switch_idx + 1] * frac
+        cr_interp = cr[switch_idx] * (1 - frac) + cr[switch_idx + 1] * frac
+
+        # Add last point from previous segment at start of the current
+        !isempty(cb_intersections) && prepend!(cb_seg, cb_intersections[end])
+        !isempty(cb_intersections) && prepend!(cr_seg, cr_intersections[end])
+
+        # Append interpolated point
+        push!(cb_seg, cb_interp)
+        push!(cr_seg, cr_interp)
+
+        # Save segment
+        push!(segments_cb, cb_seg)
+        push!(segments_cr, cr_seg)
+
+        # Start the next segment with the last value
+        push!(cb_intersections, cb_interp)
+        push!(cr_intersections, cr_interp)
+
+        # Update start index
+        start_idx = switch_idx + 1
+    end
+
+    # Last segment
+    cb_seg = cb[start_idx:end]
+    cr_seg = cr[start_idx:end]
+    !isempty(cb_intersections) && prepend!(cb_seg, cb_intersections[end])
+    !isempty(cr_intersections) && prepend!(cr_seg, cr_intersections[end])
+    push!(segments_cb, cb_seg)
+    push!(segments_cr, cr_seg)
+
+    return segments_cb, segments_cr, cb_intersections, cr_intersections, segment_signs
+end
+
+function refined_noncritical_pm_lines(
+    pricipal_axis::Symbol,
+    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    cr::NonlinearCrystal;
+    lambda_b_min::Union{Nothing,Length}=nothing,
+    lambda_b_max::Union{Nothing,Length}=nothing,
+    lambda_r12_min::Union{Nothing,Length}=nothing,
+    lambda_r12_max::Union{Nothing,Length}=nothing,
+    temp::Temperature=default_temp(cr),
+    ngrid=100,
+)
+    cpl = calc_raw_noncritical_pm_lines(
+        pricipal_axis, 
+        hi_or_lo_r1_r2_b, 
+        cr; 
+        lambda_b_min, 
+        lambda_b_max, 
+        lambda_r12_min, 
+        lambda_r12_max, 
+        temp, 
+        ngrid
+    )
+    
+    # If both red waves are polarized equally, the plot lines show a helpful phase match symmetry around the line cont_r_raw = 2 * cont_b_raw
+    is_pol_r1_r2_equal = hi_or_lo_r1_r2_b[1] == hi_or_lo_r1_r2_b[1] 
+    
+    for cl in cpl.lines
+        cont_b_raw = [v[1] for v in cl.vertices]
+        cont_r_raw = [v[2] for v in cl.vertices]
+
+        for (cb, cr) in zip(split_on_nan(cont_b_raw, cont_r_raw)...)
+            shear_cr = cr .- 2 * cb # All SHG points are now on the y = 0 axis
+            segments_cb, segments_cr, cb_intersections, cr_intersections, segment_signs = split_and_interpolate(cb, cr, sign_switch_fractions(shear_cr)...)
+            
+            if is_pol_r1_r2_equal
+                # Throw away lower part, as it is symmetric anyway
+                
+            else
+                # Flip lower parts to upper half using phase match symmetry
+                
+            end
+
+            # @show cb_intersections
+            # for i in eachindex(segments_cb)
+            #     lines!(segments_cb[i], segments_cr[i] .- 2 * segments_cb[i])
+            # end
+            # !isempty(cb_intersections) && scatter!(cb_intersections, cr_intersections .- 2 * cb_intersections)
+            
+            # if !isempty(sign_switches)
+            #     scatter!(cb[sign_switches], cr[sign_switches] .- 2 * cb[sign_switches])
+            # end
+            # lines!(cb, 1 ./ (1 ./ cb - 1 ./ cr))
+        end
+    end
+end
 
 function plot_single_noncritial_pm!(
     ax::Axis,
-    θ,
-    ϕ,
+    θ::Angle,
+    ϕ::Angle,
     hi_or_lo_r1_r2_b::AbstractVector{Symbol},
     cr::NonlinearCrystal,
     range_lambda_b,
@@ -634,74 +774,84 @@ function plot_single_noncritial_pm!(
         end
     end
 
+    # scale_limit = maximum(abs.(all_delta_k[.!isnan.(all_delta_k)]))
+    # heatmap!(ax, range_lambda_b, range_lambda_r12, all_delta_k; colormap=:vik10, colorrange=(-scale_limit, scale_limit))
+
     # Extract Δk=0 isolines using Makie contour function
-    cpl = Makie.Contours.contours(ustrip.(u"µm", range_lambda_b), ustrip.(u"µm", range_lambda_r12), all_delta_k, [0.0])
-    for cl in cpl.contours[1].lines
-        cont_b = ([v[1] for v in cl.vertices])
+    cpl = Makie.Contours.contour(range_lambda_b, range_lambda_r12, all_delta_k, 0.0)
+    for cl in cpl.lines
+        cont_b = ([v[1] for v in cl.vertices]) 
         cont_r = ([v[2] for v in cl.vertices])
-        data_valid = .!isnan.(cont_r) .&& .!isnan.(cont_b)
-        (isempty(cont_r[data_valid]) || isempty(cont_b[data_valid])) && continue
-        cont_b = cont_b[data_valid]
-        cont_r = cont_r[data_valid]
+        lines!(ax, cont_b, cont_r; color=color_r1, col_r12..., linewidth=4, label="λ_r1 for all noncritial phasematches", inspectable=true)
+    end
+    # contour!(ax, range_lambda_b, range_lambda_r12, all_delta_k, levels=[0.0])
+
+        # data_valid = .!isnan.(cont_r) .&& .!isnan.(cont_b)
+        # (isempty(cont_r[data_valid]) || isempty(cont_b[data_valid])) && continue
+        # cont_b = cont_b[data_valid]
+        # cont_r = cont_r[data_valid]
 
         # Split cont_r lines in upper red line (r1) and lower red line (r2)
-        cont_b_with_shg = []
-        cont_r_with_shg = []
-        signs_diff_r12 = []
-        shg_indices = []
-        last_diff_r12 = nothing
-        for i in eachindex(cont_b)
-            diff_r12 = 2 * cont_b[i] - cont_r[i]
+        # cont_b_with_shg = []
+        # cont_r_with_shg = []
+        # signs_diff_r12 = []
+        # shg_indices = []
+        # last_diff_r12 = nothing
+        # for i in eachindex(cont_b)
+        #     diff_r12 = 2 * cont_b[i] - cont_r[i]
 
-            # Add SHG point when difference between red curves switches signs
-            if !isnothing(last_diff_r12) && sign(diff_r12) != sign(last_diff_r12)
-                frac = -last_diff_r12 / (diff_r12 - last_diff_r12)
-                cont_b_shg = cont_b[i-1] + (cont_b[i] - cont_b[i-1]) * frac
-                cont_r12_shg = cont_r[i-1] + (cont_r[i] - cont_r[i-1]) * (cont_b_shg - cont_b[i-1]) / (cont_b[i] - cont_b[i-1])
-                push!(signs_diff_r12, 0)
-                push!(cont_r_with_shg, cont_r12_shg)
-                push!(cont_b_with_shg, cont_b_shg)
-                push!(shg_indices, length(cont_b_with_shg))
-            end
+        #     # Add SHG point when difference between red curves switches signs
+        #     if !isnothing(last_diff_r12) && sign(diff_r12) != sign(last_diff_r12)
+        #         frac = -last_diff_r12 / (diff_r12 - last_diff_r12)
+        #         cont_b_shg = cont_b[i-1] + (cont_b[i] - cont_b[i-1]) * frac
+        #         cont_r12_shg = cont_r[i-1] + (cont_r[i] - cont_r[i-1]) * (cont_b_shg - cont_b[i-1]) / (cont_b[i] - cont_b[i-1])
+        #         push!(signs_diff_r12, 0)
+        #         push!(cont_r_with_shg, cont_r12_shg)
+        #         push!(cont_b_with_shg, cont_b_shg)
+        #         push!(shg_indices, length(cont_b_with_shg))
+        #     end
 
-            # Add usual point and note sign as an indicator if the curve is r1 or r2
-            push!(signs_diff_r12, sign(diff_r12))
-            push!(cont_r_with_shg, cont_r[i])
-            push!(cont_b_with_shg, cont_b[i])
-            last_diff_r12 = diff_r12
-        end
+        #     # Add usual point and note sign as an indicator if the curve is r1 or r2
+        #     push!(signs_diff_r12, sign(diff_r12))
+        #     push!(cont_r_with_shg, cont_r[i])
+        #     push!(cont_b_with_shg, cont_b[i])
+        #     last_diff_r12 = diff_r12
+        # end
 
-        # Plot all line segments for r1 and r2 separated by shg_points
-        label_fun = (plot, index, position; lambda_r_switch=:lambda_r1) -> noncritical_pm_label(
-            plot,
-            index,
-            position,
-            θ,
-            ϕ,
-            cr,
-            temp,
-            hi_or_lo_r1_r2_b,
-            lambda_r_switch,
-        )
+        # # Plot all line segments for r1 and r2 separated by shg_points
+        # label_fun = (plot, index, position; lambda_r_switch=:lambda_r1) -> noncritical_pm_label(
+        #     plot,
+        #     index,
+        #     position,
+        #     θ,
+        #     ϕ,
+        #     cr,
+        #     temp,
+        #     hi_or_lo_r1_r2_b,
+        #     lambda_r_switch,
+        # )
 
-        cont_r_other_with_shg = (1 ./ (1 ./ cont_b_with_shg .- 1 ./ cont_r_with_shg))
-        # i_segs = [1; shg_indices; length(cont_b_with_shg)]
-        # signs_diff_r12[i_segs] # TODO!
+        # cont_r_other_with_shg = (1 ./ (1 ./ cont_b_with_shg .- 1 ./ cont_r_with_shg))
+        # # i_segs = [1; shg_indices; length(cont_b_with_shg)]
+        # # signs_diff_r12[i_segs] # TODO!
 
-        last_s = 1
-        for s in [shg_indices; length(cont_b_with_shg)]
-            if signs_diff_r12[last_s+1] <= 0
-                lines!(ax, cont_b_with_shg[last_s:s] .* u"µm", cont_r_with_shg[last_s:s] .* u"µm"; color=color_r1, col_r12..., linewidth=4, label="λ_r1 for all noncritial phasematches", inspectable=true, inspector_label=(args...) -> label_fun(args...; lambda_r_switch=:lambda_r1))
-                lines!(ax, cont_b_with_shg[last_s:s] .* u"µm", cont_r_other_with_shg[last_s:s] .* u"µm"; color=color_r2, col_r12..., linewidth=4, label="λ_r2 for all noncritial phasematches", inspectable=true, inspector_label=(args...) -> label_fun(args...; lambda_r_switch=:lambda_r2))
-            else
-                lines!(ax, cont_b_with_shg[last_s:s] .* u"µm", cont_r_with_shg[last_s:s] .* u"µm"; color=color_r2, col_r12..., linewidth=4, label="λ_r2 for all noncritial phasematches", inspectable=true, inspector_label=(args...) -> label_fun(args...; lambda_r_switch=:lambda_r2))
-                lines!(ax, cont_b_with_shg[last_s:s] .* u"µm", cont_r_other_with_shg[last_s:s] .* u"µm"; color=color_r1, col_r12..., linewidth=4, label="λ_r1 for all noncritial phasematches", inspectable=true, inspector_label=(args...) -> label_fun(args...; lambda_r_switch=:lambda_r1))
-            end
+        # last_s = 1
+        # for s in [shg_indices; length(cont_b_with_shg)]
+        #     if signs_diff_r12[last_s+1] <= 0
+        #         lines!(ax, cont_b_with_shg[last_s:s] .* u"µm", cont_r_with_shg[last_s:s] .* u"µm"; color=color_r1, col_r12..., linewidth=4, label="λ_r1 for all noncritial phasematches", inspectable=true, inspector_label=(args...) -> label_fun(args...; lambda_r_switch=:lambda_r1))
+        #         lines!(ax, cont_b_with_shg[last_s:s] .* u"µm", cont_r_other_with_shg[last_s:s] .* u"µm"; color=color_r2, col_r12..., linewidth=4, label="λ_r2 for all noncritial phasematches", inspectable=true, inspector_label=(args...) -> label_fun(args...; lambda_r_switch=:lambda_r2))
+        #     else
+        #         lines!(ax, cont_b_with_shg[last_s:s] .* u"µm", cont_r_with_shg[last_s:s] .* u"µm"; color=color_r2, col_r12..., linewidth=4, label="λ_r2 for all noncritial phasematches", inspectable=true, inspector_label=(args...) -> label_fun(args...; lambda_r_switch=:lambda_r2))
+        #         lines!(ax, cont_b_with_shg[last_s:s] .* u"µm", cont_r_other_with_shg[last_s:s] .* u"µm"; color=color_r1, col_r12..., linewidth=4, label="λ_r1 for all noncritial phasematches", inspectable=true, inspector_label=(args...) -> label_fun(args...; lambda_r_switch=:lambda_r1))
+        #     end
 
-            last_s = s
-        end
-        scatter!(ax, cont_b_with_shg[shg_indices] .* u"µm", cont_r_with_shg[shg_indices] .* u"µm"; markersize=10, label="SHG noncritial phasematch", inspectable=true, inspector_label=label_fun)
-    end
+        #     last_s = s
+        # end
+        # scatter!(ax, cont_b_with_shg[shg_indices] .* u"µm", cont_r_with_shg[shg_indices] .* u"µm"; markersize=10, label="SHG noncritial phasematch", inspectable=true, inspector_label=label_fun)
+
+        # lines!(ax, cont_b .* u"µm", cont_r .* u"µm"; color=color_r1, col_r12..., linewidth=4, label="λ_r1 for all noncritial phasematches", inspectable=true)
+        # lines!(ax, cont_b .* u"µm", 1 ./ (1 ./ cont_b .- 1 ./ cont_r) .* u"µm"; color=color_r1, col_r12..., linewidth=4, label="λ_r1 for all noncritial phasematches", inspectable=true)
+    # end
     return nothing
 end
 
@@ -714,7 +864,7 @@ function plot_noncritical_pms(
     lambda_r12_max::Union{Nothing,Length}=nothing,
     all_temp::AbstractVector{<:Temperature}=[default_temp(cr)],
     ngrid=100,
-    tol=1e-14u"nm^-1",
+    # tol=1e-14u"nm^-1",
 )
     isnothing(lambda_b_min) && (lambda_b_min = valid_lambda_range(cr)[1])
     isnothing(lambda_b_max) && (lambda_b_max = valid_lambda_range(cr)[2] / 2)
@@ -728,13 +878,16 @@ function plot_noncritical_pms(
     f = Figure(size=(1500, 500))
     all_ax = []
     for (ia, a) in enumerate(axes)
+        uc = Makie.UnitfulConversion(u"µm"; units_in_label=true)
         push!(
             all_ax,
             Axis(
                 f[1, ia],
                 xlabel="λ_b",
                 ylabel="λ_r12",
-                title="Along positive $(a) axis, Polarization direction: $(hi_or_lo_r1_r2_b)" # TODO: Add lambda names and o/e
+                title="Along positive $(a) axis, Polarization direction: $(hi_or_lo_r1_r2_b)", # TODO: Add lambda names and o/e
+                dim1_conversion=uc, 
+                dim2_conversion=uc,
             )
         )
 

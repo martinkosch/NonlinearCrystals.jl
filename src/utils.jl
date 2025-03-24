@@ -110,3 +110,63 @@ function shift_lambda_with_freq(lambda::Length, delta_omega::Frequency)
     lambda_shifted = c_0 / (2π * (omega + delta_omega))
     return lambda_shifted
 end
+
+function split_on_nan(x::AbstractVector{T}, y::AbstractVector{T}) where T
+    @assert length(x) == length(y) "Vectors must be the same length"
+
+    segments_x = Vector{T}[]
+    segments_y = Vector{T}[]
+
+    temp_x = T[]
+    temp_y = T[]
+
+    for (xi, yi) in zip(x, y)
+        if isnan(xi) || isnan(yi)
+            if !isempty(temp_x)
+                push!(segments_x, temp_x)
+                push!(segments_y, temp_y)
+                temp_x = []
+                temp_y = []
+            end
+        else
+            push!(temp_x, xi)
+            push!(temp_y, yi)
+        end
+    end
+
+    if !isempty(temp_x)
+        push!(segments_x, temp_x)
+        push!(segments_y, temp_y)
+    end
+
+    return segments_x, segments_y
+end
+
+function sign_switch_fractions(vec::AbstractVector)
+    # Find sign switches
+    sign_switches = findall(i -> sign(vec[i]) != sign(vec[i+1]), 1:length(vec)-1)
+
+    # Calculate interpolation fractions
+    fractions = Float64[]
+    for i in sign_switches
+        Δ = vec[i+1] - vec[i]
+        if Δ != 0
+            f = -vec[i] / Δ
+            push!(fractions, f)
+        else
+            push!(fractions, NaN)
+        end
+    end
+
+    # Determine sign of each segment
+    segment_signs = []
+    prev_idx = 1
+    for switch_idx in sign_switches
+        push!(segment_signs, sign(vec[prev_idx]))
+        prev_idx = switch_idx + 1
+    end
+    # Add sign of last segment
+    push!(segment_signs, sign(vec[prev_idx]))
+
+    return sign_switches, fractions, segment_signs
+end

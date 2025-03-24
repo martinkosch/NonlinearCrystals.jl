@@ -102,7 +102,7 @@ jobs:
        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       #    DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
       - name: Run doctests
-        shell: julia --color=yes {0}
+        shell: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --color=yes {0}
         run: |
           using Pkg
           Pkg.activate("./docs")

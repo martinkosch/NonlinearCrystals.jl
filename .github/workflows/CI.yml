@@ -42,7 +42,6 @@ jobs:
         shell: julia --project=monorepo {0}
         run: |
           using Pkg;
-          # dev mono repo versions
           pkg"registry up"
           Pkg.update()
           pkg"dev ."
@@ -75,15 +74,15 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v2
-      - name: Configure doc environment
-        shell: julia --project=docs --color=yes {0}
-        run: |
-          using Pkg
-          Pkg.develop(PackageSpec(path=pwd()))
-          Pkg.instantiate()
-          cd("docs")
-          Pkg.activate(".")
-          Pkg.instantiate()
+   #   - name: Configure doc environment
+   #     shell: julia --project=docs --color=yes {0}
+    #    run: |
+   #       using Pkg
+    #      Pkg.develop(PackageSpec(path=pwd()))
+   #       Pkg.instantiate()
+   #       cd("docs")
+   #       Pkg.activate(".")
+   #       Pkg.instantiate()
       - uses: julia-actions/julia-buildpkg@v1
       - name: Build and deploy docs
         env:
@@ -92,7 +91,7 @@ jobs:
         run: >
             cd docs;
             DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
-            julia --project=docs --color=yes make.jl
+            julia --color=yes make.jl
       - name: Upload site as artifact
         uses: actions/upload-artifact@v4
         with:

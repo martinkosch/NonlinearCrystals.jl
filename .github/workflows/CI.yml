@@ -44,7 +44,7 @@ jobs:
           using Pkg;
           pkg"registry up"
           Pkg.update()
-          pkg"dev ."
+          Pkg.develop(PackageSpec(path=pwd()))
       - name: Run the tests
         id: referencetests
         continue-on-error: true
@@ -74,40 +74,39 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v2
-   #   - name: Configure doc environment
-   #     shell: julia --project=docs --color=yes {0}
+    #  - name: Configure doc environment
+    #    shell: julia --project=docs --color=yes {0}
     #    run: |
-   #       using Pkg
+    #      using Pkg
     #      Pkg.develop(PackageSpec(path=pwd()))
-   #       Pkg.instantiate()
-   #       cd("docs")
-   #       Pkg.activate(".")
-   #       Pkg.instantiate()
+    #      Pkg.instantiate()
+    #      cd("docs")
+    #      Pkg.activate(".")
+    #      Pkg.instantiate()
       - uses: julia-actions/julia-buildpkg@v1
       - name: Build and deploy docs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: >
-            using Pkg
-            pkg"registry up"
-            Pkg.update()
-            pkg"dev ."
             cd docs;
             DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
-            julia --color=yes make.jl
+            julia --color=yes -e 'using Pkg; Pkg.activate("."); Pkg.develop(PackageSpec(path=(pwd() * "/.."))); include("make.jl")'
       - name: Upload site as artifact
         uses: actions/upload-artifact@v4
         with:
           name: Docs build
-          path: ./docs/build
+          path: ./build
      # - uses: julia-actions/julia-docdeploy@v1
        # env:
        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       #    DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
       - name: Run doctests
-        shell: julia --project=docs --color=yes {0}
+        shell: julia --color=yes {0}
         run: |
+          using Pkg
+          Pkg.activate(".")
+          Pkg.develop(PackageSpec(path=(pwd() * "/..")))
           using Documenter: DocMeta, doctest
           using NonlinearCrystals
           DocMeta.setdocmeta!(NonlinearCrystals, :DocTestSetup, :(using NonlinearCrystals); recursive=true)

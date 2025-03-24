@@ -8,11 +8,11 @@ makedocs(;
     authors="Martin Kosch <martin.kosch@gmail.com> and contributors",
     sitename="NonlinearCrystals.jl",
     format=Documenter.HTML(;
-        prettyurls = get(ENV, "CI", "false") == "true",
+        prettyurls=true,
         canonical="https://martinkosch.github.io/NonlinearCrystals.jl",
         edit_link="main",
         assets=String[],
-        repolink = "https://github.com/martinkosch/NonlinearCrystals.jl"
+        repolink="https://github.com/martinkosch/NonlinearCrystals.jl"
     ),
     pages=[
         "Home" => "index.md",
@@ -20,6 +20,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo = "github.com/martinkosch/NonlinearCrystals.jl",
+    repo="github.com/martinkosch/NonlinearCrystals.jl",
     devbranch="main",
 )

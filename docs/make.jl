@@ -8,7 +8,7 @@ makedocs(;
     authors="Martin Kosch <martin.kosch@gmail.com> and contributors",
     sitename="NonlinearCrystals.jl",
     format=Documenter.HTML(;
-        canonical="https://Martin Kosch.github.io/NonlinearCrystals.jl",
+        canonical="https://martinkosch.github.io/NonlinearCrystals.jl",
         edit_link="main",
         assets=String[],
     ),

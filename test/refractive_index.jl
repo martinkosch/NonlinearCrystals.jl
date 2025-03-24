@@ -2,6 +2,7 @@ using NonlinearCrystals
 using Test
 using Unitful
 using GLMakie
+import PhysicalConstants.CODATA2022: c_0
 
 # Define a simple SellmeierFunction for testing
 n_fun = (λ, T) -> 1.5 + 0.01 * (λ / 1u"µm")  # Arbitrary linear function
@@ -20,7 +21,7 @@ n_val = refractive_index(sri, λ_test, T_test)
 
 # Test dn/dλ
 dn = NonlinearCrystals.dn_dλ(sri, 1.0u"µm", T_test)
-@test dn ≈ 0.01u"µm^-1" atol=1e-4u"m^-1"
+@test dn ≈ 0.01u"µm^-1" atol = 1e-4u"m^-1"
 
 # Test d²n/dλ² (should be ~0 because n_fun linear)
 d2n = NonlinearCrystals.d2n_dλ2(sri, 1.0u"µm", T_test)
@@ -28,27 +29,30 @@ d2n = NonlinearCrystals.d2n_dλ2(sri, 1.0u"µm", T_test)
 
 # Test β0
 β0_val = β0(sri, λ_test, T_test)
-@test β0_val isa Unitful.Quantity
+@test isapprox(uconvert(u"m^-1", β0_val), 2π / (1.0u"µm") * (1.5 + 0.01), rtol=0.01)  # Expected k ≈ 2π/λ × n
 
 # Test β1 (group delay)
 β1_val = β1(sri, λ_test, T_test)
-@test β1_val isa Unitful.Quantity
+@test isapprox(uconvert(u"s/m", β1_val), 1.5 / c_0, rtol=0.01)
 
 # Test β2
 β2_val = β2(sri, λ_test, T_test)
-@test β2_val isa Unitful.Quantity
+@test isapprox(uconvert(u"s^2/m", β2_val), 0.0u"s^2/m", atol=0.01u"fs^2/mm")
 
 # Test β3 existence
 β3_val = β3(sri, λ_test, T_test)
-@test β3_val isa Unitful.Quantity
+@test isapprox(uconvert(u"s^3/m", β3_val), 0.0u"s^3/m", atol=0.01u"fs^3/mm")
 
 # Test group index and velocities
 g_idx = group_index(sri, λ_test, T_test)
-@test g_idx isa Real
+@test unit(g_idx) == Unitful.NoUnits
+@test g_idx > 0.0  # physically meaningful
+@test g_idx < 100  # physically meaningful
 
 v_p = phase_velocity(sri, λ_test, T_test)
 v_g = group_velocity(sri, λ_test, T_test)
 @test v_p > 0u"m/s"
+@test v_p < c_0
 @test v_g > 0u"m/s"
 
 # Plot function (only test that it runs without error)

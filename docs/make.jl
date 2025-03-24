@@ -18,6 +18,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/Martin Kosch/NonlinearCrystals.jl",
+    repo = "github.com/martinkosch/NonlinearCrystals.jl",
     devbranch="main",
 )

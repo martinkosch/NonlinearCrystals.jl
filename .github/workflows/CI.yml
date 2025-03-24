@@ -96,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Docs build
-          path: ./build
+          path: ./docs/build
      # - uses: julia-actions/julia-docdeploy@v1
        # env:
        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -105,8 +105,8 @@ jobs:
         shell: julia --color=yes {0}
         run: |
           using Pkg
-          Pkg.activate(".")
-          Pkg.develop(PackageSpec(path=(pwd() * "/..")))
+          Pkg.activate("./docs")
+          Pkg.develop(PackageSpec(path=(pwd())))
           using Documenter: DocMeta, doctest
           using NonlinearCrystals
           DocMeta.setdocmeta!(NonlinearCrystals, :DocTestSetup, :(using NonlinearCrystals); recursive=true)

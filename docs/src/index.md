@@ -4,7 +4,7 @@ CurrentModule = NonlinearCrystals
 
 # NonlinearCrystals
 
-Documentation for [NonlinearCrystals](https://github.com/Martin Kosch/NonlinearCrystals.jl).
+Documentation for [NonlinearCrystals](https://github.com/martinkosch/NonlinearCrystals.jl).
 
 ```@index
 ```

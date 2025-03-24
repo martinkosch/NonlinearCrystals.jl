@@ -51,8 +51,6 @@ jobs:
         run: >
           DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --color=yes --project=monorepo -e 'using Pkg; Pkg.test("NonlinearCrystals", coverage=true)'
           && echo "TESTS_SUCCESSFUL=true" >> $GITHUB_ENV
-      #- uses: julia-actions/julia-buildpkg@v1
-      #- uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v4
         with:
@@ -74,15 +72,6 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v2
-    #  - name: Configure doc environment
-    #    shell: julia --project=docs --color=yes {0}
-    #    run: |
-    #      using Pkg
-    #      Pkg.develop(PackageSpec(path=pwd()))
-    #      Pkg.instantiate()
-    #      cd("docs")
-    #      Pkg.activate(".")
-    #      Pkg.instantiate()
       - uses: julia-actions/julia-buildpkg@v1
       - name: Build and deploy docs
         env:
@@ -97,17 +86,7 @@ jobs:
         with:
           name: Docs build
           path: ./docs/build
-     # - uses: julia-actions/julia-docdeploy@v1
-       # env:
-       #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #    DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
       - name: Run doctests
-        shell: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --color=yes {0}
-        run: |
-          using Pkg
-          Pkg.activate("./docs")
-          Pkg.develop(PackageSpec(path=(pwd())))
-          using Documenter: DocMeta, doctest
-          using NonlinearCrystals
-          DocMeta.setdocmeta!(NonlinearCrystals, :DocTestSetup, :(using NonlinearCrystals); recursive=true)
-          doctest(NonlinearCrystals)
+        run: >
+            DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
+            julia --color=yes -e 'using Pkg; Pkg.activate("./docs"); Pkg.develop(PackageSpec(path=(pwd()))); using Documenter: DocMeta, doctest; using NonlinearCrystals; DocMeta.setdocmeta!(NonlinearCrystals, :DocTestSetup, :(using NonlinearCrystals); recursive=true); doctest(NonlinearCrystals)'

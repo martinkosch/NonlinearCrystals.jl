@@ -11,5 +11,4 @@ Documentation for [NonlinearCrystals](https://github.com/martinkosch/NonlinearCr
 
 ```@autodocs
 Modules = [NonlinearCrystals]
-Private = false
 ```

@@ -1,4 +1,4 @@
-export plot_noncritical_pms, plot_delta_k_map
+export calc_noncritical_pm_lines, plot_noncritical_pms, plot_delta_k_map
 
 function noncritical_pm_label(
     plot,
@@ -23,7 +23,7 @@ function noncritical_pm_label(
 end
 
 function calc_raw_noncritical_pm_lines(
-    pricipal_axis::Symbol,
+    principal_axis::Symbol,
     hi_or_lo_r1_r2_b::AbstractVector{Symbol},
     cr::NonlinearCrystal;
     lambda_b_min::Union{Nothing,Length}=nothing,
@@ -33,7 +33,7 @@ function calc_raw_noncritical_pm_lines(
     temp::Temperature=default_temp(cr),
     ngrid=100,
 )
-    @assert pricipal_axis in [:X, :Y, :Z]
+    @assert principal_axis in [:X, :Y, :Z]
 
     isnothing(lambda_b_min) && (lambda_b_min = valid_lambda_range(cr)[1])
     isnothing(lambda_b_max) && (lambda_b_max = valid_lambda_range(cr)[2] / 2)
@@ -49,7 +49,7 @@ function calc_raw_noncritical_pm_lines(
         lambda_r12 = range_lambda_r12[i_r12]
         lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_b, lambda_r1=lambda_r12)
         if is_lambda_valid(lambda_r2, cr)
-            all_delta_k[i_b, i_r12] = ustrip(u"m^-1", delta_k(axes_to_θ_ϕ(pricipal_axis)[1]..., hi_or_lo_r1_r2_b, cr; temp, lambda_r1, lambda_r2, lambda_b))
+            all_delta_k[i_b, i_r12] = ustrip(u"m^-1", delta_k(axes_to_θ_ϕ(principal_axis)[1]..., hi_or_lo_r1_r2_b, cr; temp, lambda_r1, lambda_r2, lambda_b))
         else
             all_delta_k[i_b, i_r12] = NaN
         end
@@ -107,8 +107,8 @@ function split_and_interpolate(cb::AbstractVector, cr::AbstractVector, sign_swit
     return segments_cb, segments_cr, cb_intersections, cr_intersections, segment_signs
 end
 
-function refined_noncritical_pm_lines(
-    pricipal_axis::Symbol,
+function calc_noncritical_pm_lines(
+    principal_axis::Symbol,
     hi_or_lo_r1_r2_b::AbstractVector{Symbol},
     cr::NonlinearCrystal;
     lambda_b_min::Union{Nothing,Length}=nothing,
@@ -119,7 +119,7 @@ function refined_noncritical_pm_lines(
     ngrid=100,
 )
     cpl = calc_raw_noncritical_pm_lines(
-        pricipal_axis,
+        principal_axis,
         hi_or_lo_r1_r2_b,
         cr;
         lambda_b_min,
@@ -130,8 +130,8 @@ function refined_noncritical_pm_lines(
         ngrid
     )
 
-    # If both red waves are polarized equally, the plot lines show a helpful phase match symmetry around the line cont_r_raw = 2 * cont_b_raw
-    is_pol_r1_r2_equal = (hi_or_lo_r1_r2_b[1] == hi_or_lo_r1_r2_b[2])
+    # If both red waves are polarized equally (type 1 phasematching), the plot lines show a helpful phase match symmetry around the line cont_r_raw = 2 * cont_b_raw
+    is_type_one = (hi_or_lo_r1_r2_b[1] == hi_or_lo_r1_r2_b[2])
 
     # Iterate over all identified raw contour lines and postprocess/refine them
     for cl in cpl.lines
@@ -139,32 +139,106 @@ function refined_noncritical_pm_lines(
         cont_r_raw = [v[2] for v in cl.vertices]
 
         # Kick out all NaNs and split contours into segments at all NaNs
-        for (cb, cr) in zip(split_on_nan(cont_b_raw, cont_r_raw)...)
-            shear_cr = cr .- 2 * cb # All SHG points are now on the y = 0 axis
-            segments_cb, segments_cr, cb_intersections, cr_intersections, segment_signs = split_and_interpolate(cb, cr, sign_switch_fractions(shear_cr)...)
+        for (cont_b, cont_r) in zip(split_on_nan(cont_b_raw, cont_r_raw)...)
+            shear_cr = cont_r .- 2 * cont_b # All SHG points are now on the y = 0 axis
+            segments_cb, segments_cr, cb_intersections, cr_intersections, segment_signs = split_and_interpolate(cont_b, cont_r, sign_switch_fractions(shear_cr)...)
 
-            if is_pol_r1_r2_equal
-                # Throw away lower (r1) part, as it is symmetric anyway
-                r2_segments = findall(x -> x > 0.0, segment_signs)
-                segments_cb = segments_cb[r2_segments]
-                segments_cr = segments_cr[r2_segments]
+            if is_type_one
+                # Throw away lower (r2) part, as it is symmetric anyway
+                r1_segments = findall(x -> x > 0.0, segment_signs)
+                segments_cb = segments_cb[r1_segments]
+                segments_cr = segments_cr[r1_segments]
             else
-                # Flip lower (r1) parts to upper (r2) half using phase match symmetry
+                # Flip lower (r2) parts to upper (r1) half using phase match symmetry
                 segments_cr = [segment_signs[i] < 0.0 ? 1 ./ (1 ./ segments_cb[i] - 1 ./ segments_cr[i]) : segments_cr[i] for i in eachindex(segments_cr)]
             end
 
-            @show segments_cb
+            # for i in eachindex(segments_cb)
+            #     for p in eachindex(segments_cb[i])
+            #         pm = find_nearest_pm_along_lambda_r_b(
+            #             hi_or_lo_r1_r2_b,
+            #             cr;
+            #             lambda_r1=segments_cr[i][p],
+            #             lambda_r2=nothing,
+            #             lambda_b=segments_cb[i][p],
+            #             temp,
+            #             principal_axes=principal_axis,
+            #         )
+            #         if isnothing(pm)
+            #             pop!(segments_cb[i][p])
+            #             pop!(segments_cr[i][p])
+            #         else
+            #             segments_cb[i][p] = pm.lambda_r1_r2_b[3]
+            #             segments_cr[i][p] = pm.lambda_r1_r2_b[1]
+            #         end
+            #     end
+            # end
+
             for i in eachindex(segments_cb)
                 lines!(segments_cb[i], segments_cr[i])
             end
             !isempty(cb_intersections) && scatter!(cb_intersections, cr_intersections)
 
             # if !isempty(sign_switches)
-            #     scatter!(cb[sign_switches], cr[sign_switches] .- 2 * cb[sign_switches])
+            #     scatter!(cont_b[sign_switches], cont_r[sign_switches] .- 2 * cont_b[sign_switches])
             # end
-            # lines!(cb, 1 ./ (1 ./ cb - 1 ./ cr))
+            # lines!(cont_b, 1 ./ (1 ./ cont_b - 1 ./ cont_r))
         end
     end
+end
+
+
+function calc_raw_noncritical_pm_points(
+    principal_axis::Symbol,
+    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    cr::NonlinearCrystal;
+    lambda_b_min::Union{Nothing,Length}=nothing,
+    lambda_b_max::Union{Nothing,Length}=nothing,
+    lambda_r12_min::Union{Nothing,Length}=nothing,
+    lambda_r12_max::Union{Nothing,Length}=nothing,
+    temp::Temperature=default_temp(cr),
+    ngrid=50,
+    tol=1e-14u"nm^-1",
+)
+    @assert principal_axis in [:X, :Y, :Z]
+
+    isnothing(lambda_b_min) && (lambda_b_min = valid_lambda_range(cr)[1])
+    isnothing(lambda_b_max) && (lambda_b_max = valid_lambda_range(cr)[2] / 2)
+    isnothing(lambda_r12_min) && (lambda_r12_min = valid_lambda_range(cr)[1])
+    isnothing(lambda_r12_max) && (lambda_r12_max = valid_lambda_range(cr)[2])
+
+    range_lambda_b = LinRange(lambda_b_min, lambda_b_max, ngrid) .|> u"µm"
+    all_pms_b = typeof(lambda_b_min)[]
+    all_pms_r1 = typeof(lambda_b_min)[]
+    all_pms_r2 = typeof(lambda_b_min)[]
+    for lambda_b in range_lambda_b
+        pms = find_all_pms_along_dimension(hi_or_lo_r1_r2_b, cr; lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, principal_axes=principal_axis, ngrid, tol)
+        for pm in pms
+            if pm.lambda_r1_r2_b[2] < pm.lambda_r1_r2_b[1]
+                push!(all_pms_b, lambda_b)
+                push!(all_pms_r1, pm.lambda_r1_r2_b[1])
+                push!(all_pms_r2, pm.lambda_r1_r2_b[2])
+            end
+        end
+    end
+
+    range_lambda_r1 = LinRange(lambda_r12_min, lambda_r12_max, 2 * ngrid) .|> u"µm"
+    for lambda_r1 in range_lambda_r1
+        pms = find_all_pms_along_dimension(hi_or_lo_r1_r2_b, cr; lambda_r1_fixed=lambda_r1, temp_min=temp, temp_max=temp, principal_axes=principal_axis, ngrid, tol)
+        for pm in pms
+            if pm.lambda_r1_r2_b[2] < lambda_r1
+                push!(all_pms_b, pm.lambda_r1_r2_b[3])
+                push!(all_pms_r1, lambda_r1)
+                push!(all_pms_r2, pm.lambda_r1_r2_b[2])
+            end
+        end
+    end
+    
+    idx = sortperm(all_pms_b)
+    all_pms_b = all_pms_b[idx]
+    all_pms_r1 = all_pms_r1[idx]
+    all_pms_r2 = all_pms_r2[idx]
+    return all_pms_b, all_pms_r1, all_pms_r2
 end
 
 function plot_single_noncritial_pm!(

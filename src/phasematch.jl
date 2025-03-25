@@ -2,6 +2,7 @@ export PhaseMatch, CollinearPhaseMatch, pm_wavelengths, find_all_pms_along_dimen
 
 abstract type PhaseMatch end
 
+#TODO: Explicitly set all types with units for compilation speedup
 struct CollinearPhaseMatch{LT,TT,OT,AT,IT,WT,DT,ET,ST,RT,GT,B2T,B3T,FT,FS,LBW,TBW,HBW,PBW,CT} <: PhaseMatch
     lambda_r1_r2_b::Vector{<:LT}
     temp::TT
@@ -255,32 +256,6 @@ function delta_k_with_shifting(
     )
 end
 
-# function delta_k(
-#     cpm::CollinearPhaseMatch;
-#     delta_theta=0.0u"°",
-#     delta_phi=0.0u"°",
-#     delta_temp::Temperature=0.0u"K",
-#     delta_omega_r1::Frequency=0.0u"GHz",
-#     delta_omega_r2::Frequency=0.0u"GHz",
-#     delta_omega_b::Frequency=0.0u"GHz",
-# )
-#     @assert delta_omega_r1 + delta_omega_r2 == delta_omega_b "Phasematching is only fulfilled for Δω_r1 + Δω_r2 = Δω_b"
-#     lambda_r1_shifted = shift_lambda_with_freq(cpm.lambda_r1_r2_b[1], delta_omega_r1)
-#     lambda_r2_shifted = shift_lambda_with_freq(cpm.lambda_r1_r2_b[2], delta_omega_r2)
-#     lambda_b_shifted = shift_lambda_with_freq(cpm.lambda_r1_r2_b[3], delta_omega_b)
-
-#     return delta_k(
-#         (cpm.theta_pm + delta_theta) |> u"rad",
-#         (cpm.phi_pm + delta_phi) |> u"rad",
-#         cpm.hi_or_lo_r1_r2_b,
-#         cpm.cr;
-#         lambda_r1=lambda_r1_shifted,
-#         lambda_r2=lambda_r2_shifted,
-#         lambda_b=lambda_b_shifted,
-#         temp=cpm.temp + delta_temp,
-#     )
-# end
-
 function lambda_L_bandwidths(group_index_r1_r2_b::AbstractVector{<:Real})
     # ∂Δk/∂f_r2 = ∂k_r2/∂f_r2 - ∂k_b/∂f_b for f_r1=const.
     ddelta_k_df_r2_neg_b = 2π / c_0 * (group_index_r1_r2_b[2] - group_index_r1_r2_b[3])
@@ -400,86 +375,10 @@ function phi_L_bandwidth(
 end
 
 
-# function find_pms(
-#     pol_r1_r2_b::AbstractVector{Symbol},
-#     cr::NonlinearCrystal;
-#     lambda_r1::Union{Nothing,Length}=nothing,
-#     lambda_r2::Union{Nothing,Length}=nothing,
-#     lambda_b::Union{Nothing,Length}=nothing,
-#     temp::Temperature=default_temp(cr),
-#     theta_fixed=nothing,
-#     phi_fixed=nothing,
-#     ngrid=500,
-#     tol=1e-14u"nm^-1",
-# )
-#     lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
-#     lambda_r1_r2_b = [lambda_r1, lambda_r2, lambda_b]
-
-#     hi_or_lo_r1_r2_b = polarization_r1_r2_b_to_hi_lo(pol_r1_r2_b, cr, lambda_r1_r2_b; temp)
-
-#     pms = CollinearPhaseMatch[]
-
-#     if !isnothing(theta_fixed) && isnothing(phi_fixed)
-#         # Global search over ϕ
-#         all_ϕ = range(0, 2π, length=ngrid) * u"rad"
-#         all_delta_k = [delta_k(theta_fixed, ϕ, hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp) for ϕ in all_ϕ]
-
-#         # Find approximate zero-crossings
-#         for i in 1:(length(all_ϕ)-1)
-#             if ustrip(all_delta_k[i] * all_delta_k[i+1]) < 0  # zero crossing detected
-#                 # Refine solution using local optimization
-#                 ϕ_sol = find_zero(ϕ -> delta_k(theta_fixed, ϕ, hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp),
-#                     (all_ϕ[i], all_ϕ[i+1]), Bisection(), atol=tol)
-#                 push!(pms, CollinearPhaseMatch(cr, lambda_r1_r2_b, temp, hi_or_lo_r1_r2_b, theta_fixed, ϕ_sol))
-#             end
-#         end
-
-#     elseif isnothing(theta_fixed) && !isnothing(phi_fixed)
-#         all_θ = range(0, π, length=ngrid) * u"rad"
-#         all_delta_k = [delta_k(θ, phi_fixed, hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp) for θ in all_θ]
-
-#         # Find approximate zero-crossings
-#         for i in 1:(length(all_θ)-1)
-#             if ustrip(all_delta_k[i] * all_delta_k[i+1]) < 0 # zero crossing detected
-#                 # Refine solution using local optimization
-#                 θ_sol = find_zero(θ -> delta_k(θ, phi_fixed, hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp),
-#                     (all_θ[i], all_θ[i+1]), Bisection(), atol=tol)
-#                 push!(pms, CollinearPhaseMatch(cr, lambda_r1_r2_b, temp, hi_or_lo_r1_r2_b, θ_sol, phi_fixed))
-#             end
-#         end
-#     else
-#         error("You must provide either theta_fixed or phi_fixed.")
-#     end
-#     return pms
-# end
-
-# function find_pms(
-#     cr::NonlinearCrystal;
-#     lambda_r1::Union{Nothing,Length}=nothing,
-#     lambda_r2::Union{Nothing,Length}=nothing,
-#     lambda_b::Union{Nothing,Length}=nothing,
-#     temp::Temperature=default_temp(cr),
-#     pol_r1_r2_b_vec::Union{Nothing,AbstractVector{<:AbstractVector{Symbol}}}=nothing,
-#     theta_fixed=nothing,
-#     phi_fixed=nothing,
-#     ngrid=500,
-#     tol=1e-14u"nm^-1",
-# )
-#     if isnothing(pol_r1_r2_b_vec)
-#         pol_r1_r2_b_vec = bool_permutations(:hi, :lo, 3)
-#     end
-
-#     all_res = map(pol_r1_r2_b_vec) do hi_or_lo_r1_r2_b
-#         find_pms(hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp, theta_fixed, phi_fixed, ngrid, tol)
-#     end
-
-#     return reduce(vcat, all_res)
-# end
-
 function find_nearest_pm_along_theta_phi(
     theta_target::Angle,
     phi_target::Angle,
-    pol_r1_r2_b_vec::AbstractVector{Symbol},
+    pol_r1_r2_b::AbstractVector{Symbol},
     cr::NonlinearCrystal;
     lambda_r1::Union{Nothing,Length}=nothing,
     lambda_r2::Union{Nothing,Length}=nothing,
@@ -488,8 +387,8 @@ function find_nearest_pm_along_theta_phi(
     ngrid=500,
     tol=1e-14u"nm^-1",
 )
-    all_pm_θ_fixed = find_all_pms_along_dimension(pol_r1_r2_b_vec, cr; lambda_r1_fixed=lambda_r1, lambda_r2_fixed=lambda_r2, lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, ngrid, tol, theta_fixed=theta_target)
-    all_pm_ϕ_fixed = find_all_pms_along_dimension(pol_r1_r2_b_vec, cr; lambda_r1_fixed=lambda_r1, lambda_r2_fixed=lambda_r2, lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, ngrid, tol, phi_fixed=phi_target)
+    all_pm_θ_fixed = find_all_pms_along_dimension(pol_r1_r2_b, cr; lambda_r1_fixed=lambda_r1, lambda_r2_fixed=lambda_r2, lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, ngrid, tol, theta_fixed=theta_target)
+    all_pm_ϕ_fixed = find_all_pms_along_dimension(pol_r1_r2_b, cr; lambda_r1_fixed=lambda_r1, lambda_r2_fixed=lambda_r2, lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, ngrid, tol, phi_fixed=phi_target)
 
     all_pm_candidates = [[pm for pm in all_pm_θ_fixed]; [pm for pm in all_pm_ϕ_fixed]]
     isempty(all_pm_candidates) && return nothing
@@ -505,34 +404,34 @@ function find_nearest_pm_along_theta_phi(
 end
 
 function find_nearest_pm_along_lambda_r_b(
-    pol_r1_r2_b_vec::AbstractVector{Symbol},
+    pol_r1_r2_b::AbstractVector{Symbol},
     cr::NonlinearCrystal;
     lambda_r1::Union{Nothing,Length}=nothing,
     lambda_r2::Union{Nothing,Length}=nothing,
     lambda_b::Union{Nothing,Length}=nothing,
     temp::Temperature=default_temp(cr),
-    pricipal_axes::Union{AbstractVector{Symbol},Symbol,Nothing}=nothing,
+    principal_axes::Union{AbstractVector{Symbol},Symbol,Nothing}=nothing,
     ngrid=500,
     tol=1e-14u"nm^-1",
 )
     @assert count(isnothing.([lambda_r1, lambda_r2])) == 1 "Either lambda_r1 or lambda_r2 must be given and the other one must be nothing."
 
     # Search along lambda_b
-    all_pm_lambda_b = find_all_pms_along_dimension(pol_r1_r2_b_vec, cr;
+    all_pm_lambda_b = find_all_pms_along_dimension(pol_r1_r2_b, cr;
         lambda_b_fixed=lambda_b,
         temp_min=temp,
         temp_max=temp,
-        pricipal_axes=pricipal_axes,
+        principal_axes=principal_axes,
         ngrid=ngrid,
         tol=tol)
 
     # Search along lambda_r1 or lambda_r2
-    all_pm_lambda_r = find_all_pms_along_dimension(pol_r1_r2_b_vec, cr;
+    all_pm_lambda_r = find_all_pms_along_dimension(pol_r1_r2_b, cr;
         lambda_r1_fixed=lambda_r1,
         lambda_r2_fixed=lambda_r2,
         temp_min=temp,
         temp_max=temp,
-        pricipal_axes=pricipal_axes,
+        principal_axes=principal_axes,
         ngrid=ngrid,
         tol=tol)
 
@@ -562,7 +461,7 @@ function find_all_pms_along_dimension(
     lambda_b_fixed::Union{Nothing,Length}=nothing,
     temp_min::Temperature=default_temp(cr),
     temp_max::Temperature=default_temp(cr),
-    pricipal_axes::Union{AbstractVector{Symbol},Symbol,Nothing}=nothing,
+    principal_axes::Union{AbstractVector{Symbol},Symbol,Nothing}=nothing,
     theta_fixed=nothing,
     phi_fixed=nothing,
     ngrid=500,
@@ -572,7 +471,7 @@ function find_all_pms_along_dimension(
     temp_fixed = (temp_min == temp_max) ? temp_min : nothing
 
     if !isnothing(theta_fixed) || !isnothing(phi_fixed)
-        @assert isnothing(pricipal_axes) "pricipal_axes must be `nothing` if searching along fixed θ or ϕ directions."
+        @assert isnothing(principal_axes) "principal_axes must be `nothing` if searching along fixed θ or ϕ directions."
         @assert !isnothing(temp_fixed) "Fix temperature by selecting temp_min = temp_max if searching along fixed θ or ϕ directions."
         return _pms_vs_angle(pol_r1_r2_b, cr; lambda_r1=lambda_r1_fixed, lambda_r2=lambda_r2_fixed, lambda_b=lambda_b_fixed, temp=temp_fixed, theta_fixed, phi_fixed, ngrid, tol)
     end
@@ -583,17 +482,17 @@ function find_all_pms_along_dimension(
 
     hi_or_lo_r1_r2_b = pol_r1_r2_b # TODO: Enable searching along temperature and wavelengths with :o/:e notation
 
-    if isnothing(pricipal_axes) && isnothing(theta_fixed) && isnothing(phi_fixed)
-        pricipal_axes = [:X, :Y, :Z]
+    if isnothing(principal_axes) && isnothing(theta_fixed) && isnothing(phi_fixed)
+        principal_axes = [:X, :Y, :Z]
     end
-    θ_ϕ_pricipal_axes = axes_to_θ_ϕ(pricipal_axes)
+    θ_ϕ_principal_axes = axes_to_θ_ϕ(principal_axes)
 
     if isnothing(temp_fixed)
-        return _pms_vs_temperature(θ_ϕ_pricipal_axes, hi_or_lo_r1_r2_b, cr, lambda_r1_fixed, lambda_r2_fixed, lambda_b_fixed, temp_min, temp_max, ngrid, tol)
+        return _pms_vs_temperature(θ_ϕ_principal_axes, hi_or_lo_r1_r2_b, cr, lambda_r1_fixed, lambda_r2_fixed, lambda_b_fixed, temp_min, temp_max, ngrid, tol)
     elseif isnothing(lambda_b_fixed)
-        return _pms_vs_lambda_b(θ_ϕ_pricipal_axes, hi_or_lo_r1_r2_b, cr, lambda_r1_fixed, lambda_r2_fixed, temp_fixed, λmin, λmax, ngrid, tol)
+        return _pms_vs_lambda_b(θ_ϕ_principal_axes, hi_or_lo_r1_r2_b, cr, lambda_r1_fixed, lambda_r2_fixed, temp_fixed, λmin, λmax, ngrid, tol)
     elseif isnothing(lambda_r1_fixed) && isnothing(lambda_r2_fixed)
-        return _pms_vs_lambda_r1(θ_ϕ_pricipal_axes, hi_or_lo_r1_r2_b, cr, lambda_b_fixed, temp_fixed, λmin, λmax, ngrid, tol)
+        return _pms_vs_lambda_r1(θ_ϕ_principal_axes, hi_or_lo_r1_r2_b, cr, lambda_b_fixed, temp_fixed, λmin, λmax, ngrid, tol)
     else
         error("This should never be reached.")
     end
@@ -663,30 +562,38 @@ function _pms_vs_lambda_b(θ_ϕs, hi_or_lo_r1_r2_b, cr, λr1_fix, λr2_fix, temp
 
     for θ_ϕ in θ_ϕs
         if !isnothing(λr1_fix)
-            λb_range = range(
-                max(λmin, 1 / (1 / λr1_fix + 1 / λmin)),
-                min(λmax, 1 / (1 / λr1_fix + 1 / λmax)),
-                length=ngrid
-            )
-            Δk = [delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=λr1_fix, lambda_r2=(1 / (1 / λb - 1 / λr1_fix)), lambda_b=λb, temp=temp) for λb in λb_range]
-        else
-            λb_range = range(
-                max(λmin, 1 / (1 / λr2_fix + 1 / λmin)),
-                min(λmax, 1 / (1 / λr2_fix + 1 / λmax)),
-                length=ngrid
-            )
-            Δk = [delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=(1 / (1 / λb - 1 / λr2_fix)), lambda_r2=λr2_fix, lambda_b=λb, temp=temp) for λb in λb_range]
+            if 1 / (1 / λr1_fix + 1 / λmax) < λmin
+                λb_range = []
+            else
+                λb_range = range(
+                    λmin,
+                    1 / (1 / λr1_fix + 1 / λmax),
+                    length=ngrid
+                )
+                Δk = [delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=λr1_fix, lambda_b=λb, temp=temp) for λb in λb_range]
+            end
+        else # !isnothing(λr2_fix)
+            if 1 / (1 / λr2_fix + 1 / λmax) < λmin
+                λb_range = []
+            else
+                λb_range = range(
+                    λmin,
+                    1 / (1 / λr2_fix + 1 / λmax),
+                    length=ngrid
+                )
+                Δk = [delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r2=λr2_fix, lambda_b=λb, temp=temp) for λb in λb_range]
+            end
         end
 
         for i in 1:length(λb_range)-1
             if ustrip(Δk[i] * Δk[i+1]) < 0
                 if !isnothing(λr1_fix)
-                    fun = λb -> delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=λr1_fix, lambda_r2=(1 / (1 / λb - 1 / λr1_fix)), lambda_b=λb, temp=temp)
+                    fun = λb -> delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=λr1_fix, lambda_b=λb, temp=temp)
                     λb_sol = find_zero(fun, (λb_range[i], λb_range[i+1]), Bisection(), atol=tol)
                     λr2_sol = 1 / (1 / λb_sol - 1 / λr1_fix)
                     push!(pms, CollinearPhaseMatch(cr, [λr1_fix, λr2_sol, λb_sol], temp, hi_or_lo_r1_r2_b, θ_ϕ...))
                 else
-                    fun = λb -> delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=(1 / (1 / λb - 1 / λr2_fix)), lambda_r2=λr2_fix, lambda_b=λb, temp=temp)
+                    fun = λb -> delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r2=λr2_fix, lambda_b=λb, temp=temp)
                     λb_sol = find_zero(fun, (λb_range[i], λb_range[i+1]), Bisection(), atol=tol)
                     λr1_sol = 1 / (1 / λb_sol - 1 / λr2_fix)
                     push!(pms, CollinearPhaseMatch(cr, [λr1_sol, λr2_fix, λb_sol], temp, hi_or_lo_r1_r2_b, θ_ϕ...))
@@ -703,8 +610,10 @@ function _pms_vs_lambda_r1(θ_ϕs, hi_or_lo_r1_r2_b, cr, λb, temp, λmin, λmax
 
     for θ_ϕ in θ_ϕs
         λr1_range = range(
-            max(λmin, 1 / (1 / λb - 1 / λmax)),
-            min(2 * λb, 1 / (1 / λb - 1 / (2 * λb))),
+            max(λmin, 2 * λb),
+            min(λmax, 1 / (1 / λb - 1 / λmax)),
+            # 1 / (1 / λb - 1 / λmax),
+            # λmax,
             length=ngrid
         )
         Δk = [delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=λr1, lambda_r2=(1 / (1 / λb - 1 / λr1)), lambda_b=λb, temp=temp) for λr1 in λr1_range]

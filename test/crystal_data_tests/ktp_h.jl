@@ -30,10 +30,10 @@ using Unitful
 @test isapprox(KTP_H.n_z_principal.dn_dtemp_fun(1.0642u"µm", 293u"K"), 3.40e-5u"K^-1", atol=0.1e-5u"K^-1")
 
 # Test sampled phasematches (from: Handbook of Nonlinear Crystals)
-pm1 = find_nearest_pm(90u"°", 24.0u"°", [:lo, :hi, :lo], KTP_H; lambda_r1=1.062u"µm", lambda_b=1.062u"µm" / 2, temp=293u"K") 
+pm1 = find_nearest_pm_along_theta_phi(90u"°", 24.0u"°", [:lo, :hi, :lo], KTP_H; lambda_r1=1.062u"µm", lambda_b=1.062u"µm" / 2, temp=293u"K") 
 @test all(isnothing.(pm1.o_or_e_r1_r2_b)) || all(pm1.o_or_e_r1_r2_b .== [:e, :o, :e])
 @test isapprox(pm1.phi_pm, 24.0u"°", atol=ustrip(u"rad", 4u"°"))
 
-pm2 = find_nearest_pm(63.2u"°", 90.0u"°", [:lo, :hi, :lo], KTP_H; lambda_r1=1.338u"µm", lambda_b=0.446u"µm", temp=293u"K")
+pm2 = find_nearest_pm_along_theta_phi(63.2u"°", 90.0u"°", [:lo, :hi, :lo], KTP_H; lambda_r1=1.338u"µm", lambda_b=0.446u"µm", temp=293u"K")
 @test all(isnothing.(pm2.o_or_e_r1_r2_b)) || all(pm2.o_or_e_r1_r2_b .== [:o, :e, :o])
 @test isapprox(pm2.theta_pm, 63.2u"°", atol=ustrip(u"rad", 4u"°"))

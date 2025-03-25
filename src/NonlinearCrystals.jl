@@ -18,6 +18,7 @@ include("refractive_index.jl")
 include("crystal_symmetry.jl")
 include("crystals.jl")
 include("phasematch.jl")
+include("plot_phasematch.jl")
 
 # Include all crystals
 include("crystal_data/bbo.jl")

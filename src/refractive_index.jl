@@ -98,8 +98,8 @@ struct SellmeierFunction{FL,LR,TF,FT,TR} <: RefractiveIndex
     end
 end
 
-function is_lambda_valid(lambda::Length, sri::SellmeierFunction)
-    return lambda >= sri.lambda_range[1] && lambda <= sri.lambda_range[2]
+function is_lambda_valid(lambda::Length, sri::SellmeierFunction; warn_tol::Length=1u"nm")
+    return lambda >= (sri.lambda_range[1] - warn_tol) && lambda <= (sri.lambda_range[2] + warn_tol)
 end
 
 function refractive_index(
@@ -107,10 +107,11 @@ function refractive_index(
     lambda::Length,
     temp::Temperature=sri.temp_ref;
     check_lambda_range::Symbol=:warn,
-    check_temp_range::Symbol=:warn
+    check_temp_range::Symbol=:warn,
+    warn_tol::Length=1u"nm",
 )
     if check_lambda_range != :none
-        if !is_lambda_valid(lambda, sri)
+        if !is_lambda_valid(lambda, sri; warn_tol)
             str = "Wavelength λ=$(lambda) out of valid range for Sellmeier equation [$(sri.lambda_range[1]), $(sri.lambda_range[2])]"
             check_lambda_range == :warn ? (@warn str) : (@error str)
         end

@@ -10,8 +10,8 @@ function default_temp(cr::NonlinearCrystal)
     cr.n_x_principal.temp_ref
 end
 
-function is_lambda_valid(lambda::Length, cr::NonlinearCrystal)
-    return is_lambda_valid(lambda, cr.n_x_principal) && is_lambda_valid(lambda, cr.n_y_principal) && is_lambda_valid(lambda, cr.n_z_principal)
+function is_lambda_valid(lambda::Length, cr::NonlinearCrystal; warn_tol::Length=1u"nm")
+    return is_lambda_valid(lambda, cr.n_x_principal; warn_tol) && is_lambda_valid(lambda, cr.n_y_principal; warn_tol) && is_lambda_valid(lambda, cr.n_z_principal; warn_tol)
 end
 
 function valid_lambda_range(cr::NonlinearCrystal)
@@ -243,9 +243,6 @@ function refraction_data_hi_lo(
     temp::Temperature=default_temp(cr);
     n_hi_lo_only::Bool=false,
 )
-    θ = θ |> u"rad"
-    ϕ = ϕ |> u"rad"
-
     k_dir, ε_tensor, n_xyz = calc_k_dir_ε_tensor_n_xyz(θ, ϕ, cr, lambda, temp)
     n_hi_lo, D_dir_hi_lo = calc_n_hi_lo_D_dir_hi_lo(k_dir, ε_tensor)
     n_hi_lo_only && return n_hi_lo
@@ -271,9 +268,6 @@ function calc_k_dir_ε_tensor_n_xyz(
     lambda::Length=default_lambda(cr),
     temp::Temperature=default_temp(cr),
 )
-    θ = θ |> u"rad"
-    ϕ = ϕ |> u"rad"
-
     nx = refractive_index(cr.n_x_principal, lambda, temp)
     ny = refractive_index(cr.n_y_principal, lambda, temp)
     nz = refractive_index(cr.n_z_principal, lambda, temp)
@@ -323,8 +317,6 @@ end
 
 # β0 = k
 function calc_β0_hi_lo(θ::Angle, ϕ::Angle, cr::NonlinearCrystal, lambda::Length=default_lambda(cr), temp::Temperature=default_temp(cr))
-    θ = θ |> u"rad"
-    ϕ = ϕ |> u"rad"
     n_hi_lo = refraction_data_hi_lo(θ, ϕ, cr, lambda, temp; n_hi_lo_only=true)
     return Tuple([(2π / lambda * n) |> u"m^-1" for n in n_hi_lo])
 end
@@ -332,8 +324,6 @@ calc_β0_hi_lo(θ::Angle, cr::UnidirectionalCrystal, args...; kwargs...) = calc_
 
 # β1 = ∂k/∂ω
 function calc_β1_hi_lo(θ::Angle, ϕ::Angle, cr::NonlinearCrystal, lambda::Length=default_lambda(cr), temp::Temperature=default_temp(cr))
-    θ = θ |> u"rad"
-    ϕ = ϕ |> u"rad"
     ω_in = 2π * c_0 / lambda
 
     fun = ω -> [ustrip(d) for d in calc_β0_hi_lo(θ, ϕ, cr, uconvert(u"m", 2π * c_0 / ω * 1u"s"), temp)]
@@ -347,8 +337,6 @@ calc_β1_hi_lo(θ::Angle, cr::UnidirectionalCrystal, args...; kwargs...) = calc_
 
 # β2 = ∂²k/∂ω²
 function calc_β2_hi_lo(θ::Angle, ϕ::Angle, cr::NonlinearCrystal, lambda::Length=default_lambda(cr), temp::Temperature=default_temp(cr))
-    θ = θ |> u"rad"
-    ϕ = ϕ |> u"rad"
     ω_in = 2π * c_0 / lambda
 
     fun = ω -> [ustrip(d) for d in calc_β1_hi_lo(θ, ϕ, cr, uconvert(u"m", 2π * c_0 / ω * 1u"s"), temp)]
@@ -362,8 +350,6 @@ calc_β2_hi_lo(θ::Angle, cr::UnidirectionalCrystal, args...; kwargs...) = calc_
 
 # β3 = ∂³k/∂ω³
 function calc_β3_hi_lo(θ::Angle, ϕ::Angle, cr::NonlinearCrystal, lambda::Length=default_lambda(cr), temp::Temperature=default_temp(cr))
-    θ = θ |> u"rad"
-    ϕ = ϕ |> u"rad"
     ω_in = 2π * c_0 / lambda
 
     fun = ω -> [ustrip(d) for d in calc_β2_hi_lo(θ, ϕ, cr, uconvert(u"m", 2π * c_0 / ω * 1u"s"), temp)]
@@ -376,8 +362,6 @@ end
 calc_β3_hi_lo(θ::Angle, cr::UnidirectionalCrystal, args...; kwargs...) = calc_β3_hi_lo(θ, 0.0u"rad", cr, args...; kwargs...)
 
 function calc_group_index_hi_lo(θ::Angle, ϕ::Angle, cr::NonlinearCrystal, lambda::Length=default_lambda(cr), temp::Temperature=default_temp(cr))
-    θ = θ |> u"rad"
-    ϕ = ϕ |> u"rad"
     return Tuple([β1 * c_0 for β1 in calc_β1_hi_lo(θ, ϕ, cr, lambda, temp)])
 end
 calc_group_index_hi_lo(θ::Angle, cr::UnidirectionalCrystal, args...; kwargs...) = calc_group_index_hi_lo(θ, 0.0u"rad", cr, args...; kwargs...)

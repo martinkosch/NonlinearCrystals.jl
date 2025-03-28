@@ -163,14 +163,15 @@ function calc_noncritical_pm_lines(
         end
     end
 
-    all_segments_b = reduce(vcat, all_segments_b)
-    all_segments_r = reduce(vcat, all_segments_r)
-    all_cb_intersections = reduce(vcat, all_cb_intersections)
-    all_cr_intersections = reduce(vcat, all_cr_intersections)
+    all_segments_b = reduce(vcat, all_segments_b; init=[])
+    all_segments_r = reduce(vcat, all_segments_r; init=[])
+    all_cb_intersections = reduce(vcat, all_cb_intersections; init=[])
+    all_cr_intersections = reduce(vcat, all_cr_intersections; init=[])
     return all_segments_b, all_segments_r, all_cb_intersections, all_cr_intersections
 end
 
-function plot_single_noncritical_pm(
+function plot_single_noncritical_pm!(
+    ax::Axis, 
     principal_axis::Symbol,
     hi_or_lo_r1_r2_b::AbstractVector{Symbol},
     cr::NonlinearCrystal;
@@ -182,6 +183,8 @@ function plot_single_noncritical_pm(
     ngrid=50,
     tol=1e-14u"nm^-1",
 )
+    is_type_1 = hi_or_lo_r1_r2_b[1]===hi_or_lo_r1_r2_b[2]
+
     all_segments_b, all_segments_r1, all_cb_intersections, all_cr_intersections = calc_noncritical_pm_lines(
         principal_axis,
         hi_or_lo_r1_r2_b,
@@ -194,17 +197,6 @@ function plot_single_noncritical_pm(
         ngrid,
     )
 
-    f = Figure(size=(1000, 800))
-    uc = Makie.UnitfulConversion(u"µm"; units_in_label=true)
-    ax = Axis(
-        f[1, 1],
-        xlabel="λ_b",
-        ylabel="λ_r12",
-        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, polarization directions: $(hi_or_lo_r1_r2_b)", # TODO: Add lambda names and o/e
-        dim1_conversion=uc,
-        dim2_conversion=uc,
-    )
-
     vline_lab = (plot, idx, pos) -> begin
         pos = pos * u"µm"
         marker_x[] = [ustrip(u"µm", pos[1])]
@@ -214,13 +206,13 @@ function plot_single_noncritical_pm(
         marker_y_r2[] = is_r1 ? [1 / (1 / pos[1] - 1 / pos[2])] : [pos[2]]
 
         pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_r1_r2_b, cr; lambda_r1=marker_y_r1[][1], lambda_b=marker_x_b[][1], temp, principal_axis, ngrid, tol)
-        return plot_pm_label(pm)
+        return "$(is_type_1 ? "Type 1" : "Type 2") noncritical phasematch\n" * plot_pm_label(pm)
     end
 
     shg_lab = (plot, idx, pos) -> begin
         pos = pos * u"µm"
         pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_r1_r2_b, cr; lambda_r1=pos[2], lambda_b=pos[1], temp, principal_axis, ngrid, tol)
-        return "SHG point\n" * plot_pm_label(pm)
+        return "$(is_type_1 ? "Type 1" : "Type 2") noncritical phasematch SHG point\n" * plot_pm_label(pm)
     end
 
     vline_clear = (inspector, plot) -> begin
@@ -231,9 +223,9 @@ function plot_single_noncritical_pm(
         return nothing
     end
 
-    [lines!(ax, all_segments_b[i], all_segments_r1[i], color=COL_R1, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
-    [lines!(ax, all_segments_b[i], 1 ./ (1 ./ all_segments_b[i] .- 1 ./ all_segments_r1[i]), color=COL_R2, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
-    scatter!(ax, all_cb_intersections, all_cr_intersections; inspectable=true, inspector_label=shg_lab)
+    [lines!(ax, all_segments_b[i], all_segments_r1[i]; linestyle=hi_or_lo_r1_r2_b[1] === :hi ? :dash : :solid, color=COL_R1, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
+    [lines!(ax, all_segments_b[i], 1 ./ (1 ./ all_segments_b[i] .- 1 ./ all_segments_r1[i]); linestyle=hi_or_lo_r1_r2_b[2] === :hi ? :dash : :solid, color=COL_R2, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
+    !isempty(all_cb_intersections) && scatter!(ax, all_cb_intersections, all_cr_intersections; inspectable=true, inspector_label=shg_lab)
 
     marker_x = Observable([NaN]) # Workaround: vlines! is not yet compatible with unit observables
     marker_x_b = Observable([NaN * u"µm"])
@@ -242,9 +234,53 @@ function plot_single_noncritical_pm(
     vlines!(ax, marker_x; inspectable=false, color=:gray, linewidth=2, alpha=0.5)
     scatter!(ax, marker_x_b, marker_y_r1; inspectable=false, color=COL_R1)
     scatter!(ax, marker_x_b, marker_y_r2; inspectable=false, color=COL_R2)
+    return ax
+end
+
+function plot_noncritical_pm(
+    principal_axis::Symbol,
+    cr::NonlinearCrystal;
+    hi_or_lo_r1_r2_b::Union{AbstractVector{Symbol}, Nothing}=nothing,
+    lambda_b_min::Union{Nothing,Length}=nothing,
+    lambda_b_max::Union{Nothing,Length}=nothing,
+    lambda_r12_min::Union{Nothing,Length}=nothing,
+    lambda_r12_max::Union{Nothing,Length}=nothing,
+    temp::Temperature=default_temp(cr),
+    ngrid=50,
+    tol=1e-14u"nm^-1",
+)
+
+    f = Figure(size=(1000, 800))
+    uc = Makie.UnitfulConversion(u"µm"; units_in_label=true)
+    ax = Axis(
+        f[1, 1],
+        xlabel="λ_b",
+        ylabel="λ_r12",
+        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, Temperature: $(temp |> u"K") ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_r1_r2_b) # TODO: Add lambda names and o/e
+        dim1_conversion=uc,
+        dim2_conversion=uc,
+    )
+
+    all_hi_or_lo_r1_r2_b = isnothing(hi_or_lo_r1_r2_b) ? bool_permutations(:hi, :lo, 3) : [hi_or_lo_r1_r2_b] # TODO: Only iterate promising polarization combinations
+    setdiff!(all_hi_or_lo_r1_r2_b, [[:hi, :lo, :lo], [:hi, :lo, :hi], [:lo, :lo, :lo], [:hi, :hi, :hi]]) # Prevent double plotting of Type 2 noncritical phasematches and unphysical phasematches 
+
+    for hl in all_hi_or_lo_r1_r2_b
+        plot_single_noncritical_pm!(
+            ax, 
+            principal_axis,
+            hl,
+            cr;
+            lambda_b_min,
+            lambda_b_max,
+            lambda_r12_min,
+            lambda_r12_max,
+            temp,
+            ngrid,
+            tol,
+        )
+    end
 
     DataInspector(f)
-
     return f
 end
 
@@ -262,15 +298,8 @@ function plot_delta_k_map(
     plot_type::Symbol=:polar,
     show_coordinates::Bool=true,
     show_optical_axes::Bool=true,
+    size::NTuple{2,Int}=(800, 600),
 )
-    # Color settings
-    col_coordinates = (color=5, colormap=:Greys, colorrange=(1, 10))
-    col_contour = (color=1, colormap=:Set1_9, colorrange=(1, 9))
-    col_r1 = (color=9, colormap=:vik10, colorrange=(1, 10))
-    col_r2 = (color=8, colormap=:vik10, colorrange=(1, 10))
-    col_b = (color=3, colormap=:vik10, colorrange=(1, 10))
-    col_heatmap = (colormap=:vik,)
-
     # Prepare data
     lambda_r1_r2_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
 
@@ -304,12 +333,7 @@ function plot_delta_k_map(
             digits,
             show_coordinates,
             show_optical_axes,
-            col_coordinates,
-            col_contour,
-            col_r1,
-            col_r2,
-            col_b,
-            col_heatmap,
+            size,
         )
     elseif plot_type == :sphere
         return plot_sphere_mode(
@@ -328,12 +352,7 @@ function plot_delta_k_map(
             axis_length,
             show_coordinates,
             show_optical_axes,
-            col_coordinates,
-            col_contour,
-            col_r1,
-            col_r2,
-            col_b,
-            col_heatmap,
+            size,
         )
     else
         error("Plot type $(plot_type) unknown.")
@@ -397,36 +416,33 @@ function plot_polar_mode(
     digits::Integer,
     show_coordinates::Bool,
     show_optical_axes::Bool,
-    col_coordinates,
-    col_contour,
-    col_r1,
-    col_r2,
-    col_b,
-    col_heatmap,
+    size::NTuple{2,Int}=(800, 600),
 )
-    f = Figure()
+    f = Figure(; size)
+    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(temp |> u"K") ($(float(temp |> u"°C")))"
+    lambda_info = "$(round(u"nm", lambda_r1_r2_b[1]; digits)) (λ_r1, $(hi_or_lo_r1_r2_b[1])) + $(round(u"nm", lambda_r1_r2_b[2]; digits)) (λ_r2, $(hi_or_lo_r1_r2_b[2])) = $(round(u"nm", lambda_r1_r2_b[3]; digits)) (λ_b, $(hi_or_lo_r1_r2_b[3]))"
     ax = Axis(
         f[1, 1],
         xlabel="ϕ",
         ylabel="θ",
-        title="$(round(u"nm", lambda_r1_r2_b[1]; digits)) (λ_r1, $(hi_or_lo_r1_r2_b[1])) + $(round(u"nm", lambda_r1_r2_b[2]; digits)) (λ_r2, $(hi_or_lo_r1_r2_b[2])) = $(round(u"nm", lambda_r1_r2_b[3]; digits)) (λ_b, $(hi_or_lo_r1_r2_b[3]))"
+        title=title=cr_info * "\n" * lambda_info
     )
 
-    heatmap!(ax, ϕ_range .|> u"°", θ_range .|> u"°", all_delta_k'; col_heatmap..., colorrange=(-scale_limit, scale_limit), inspectable=false)
+    heatmap!(ax, ϕ_range .|> u"°", θ_range .|> u"°", all_delta_k'; colormap=COLORMAP_HEATMAP, colorrange=(-scale_limit, scale_limit), inspectable=false)
 
-    plot_polar_contours!(ax, cpl, col_contour, cr, temp, hi_or_lo_r1_r2_b, lambda_r1_r2_b)
+    plot_polar_contours!(ax, cpl, cr, temp, hi_or_lo_r1_r2_b, lambda_r1_r2_b)
     plot_polar_pms!(ax, pms)
 
     if show_coordinates
-        plot_polar_coordinate_markers!(ax, col_coordinates)
+        plot_polar_coordinate_markers!(ax)
     end
 
     if show_optical_axes
-        plot_polar_optical_axes!(ax, oa; col_r1, col_r2, col_b)
+        plot_polar_optical_axes!(ax, oa)
     end
 
     # Legend(f[1, 2], ax)
-    Colorbar(f[1, 2]; col_heatmap..., limits=(-scale_limit, scale_limit), label="Δk in µm⁻¹")
+    Colorbar(f[1, 2]; colormap=COLORMAP_HEATMAP, limits=(-scale_limit, scale_limit), label="Δk in µm⁻¹")
     DataInspector(ax)
 
     return f
@@ -456,7 +472,6 @@ end
 function plot_polar_contours!(
     ax::Axis,
     cpl,
-    col_contour,
     cr::NonlinearCrystal,
     temp::Temperature,
     hi_or_lo_r1_r2_b::AbstractVector{Symbol},
@@ -470,9 +485,9 @@ function plot_polar_contours!(
 
         lines!(
             ax, ϕi_cl, θi_cl;
-            color=:black, linewidth=2, fxaa=true, inspectable=true,
+            linewidth=2, fxaa=true, inspectable=true,
             inspector_label=label_fun,
-            label=(i == 1 ? "Phase matches" : nothing), col_contour...
+            label=(i == 1 ? "Phase matches" : nothing), color=COL_CONTOUR
         )
     end
 end
@@ -488,46 +503,46 @@ function plot_polar_pms!(ax::Axis, pms::AbstractVector)
     end
 end
 
-function plot_polar_coordinate_markers!(ax::Axis, col_coordinates)
+function plot_polar_coordinate_markers!(ax::Axis)
     digits = 3
     all_coordinate_labels = [
-        (0.0, 0.0, "Z", (:left, :bottom)),
-        (0.0, π / 2, "Z", (:left, :bottom)),
-        (0.0, π, "Z", (:left, :bottom)),
-        (0.0, 3π / 2, "Z", (:left, :bottom)),
-        (0.0, 2π, "Z", (:right, :bottom)),
-        (π / 2, 0.0, "X", (:left, :bottom)),
-        (π / 2, π / 2, "Y", (:left, :bottom)),
-        (π / 2, π, "X", (:left, :bottom)),
-        (π / 2, 3π / 2, "Y", (:left, :bottom)),
-        (π / 2, 2π, "X", (:right, :bottom)),
-        (π, 0.0, "Z", (:left, :top)),
-        (π, π / 2, "Z", (:right, :top)),
-        (π, π, "Z", (:right, :top)),
-        (π, 3π / 2, "Z", (:right, :top)),
-        (π, 2π, "Z", (:right, :top)),
+        (0.0, 0.0, "+Z", (:left, :bottom)),
+        (0.0, π / 2, "+Z", (:left, :bottom)),
+        (0.0, π, "+Z", (:left, :bottom)),
+        (0.0, 3π / 2, "+Z", (:left, :bottom)),
+        (0.0, 2π, "+Z", (:right, :bottom)),
+        (π / 2, 0.0, "+X", (:left, :bottom)),
+        (π / 2, π / 2, "+Y", (:left, :bottom)),
+        (π / 2, π, "-X", (:left, :bottom)),
+        (π / 2, 3π / 2, "-Y", (:left, :bottom)),
+        (π / 2, 2π, "+X", (:right, :bottom)),
+        (π, 0.0, "-Z", (:left, :top)),
+        (π, π / 2, "-Z", (:right, :top)),
+        (π, π, "-Z", (:right, :top)),
+        (π, 3π / 2, "-Z", (:right, :top)),
+        (π, 2π, "-Z", (:right, :top)),
     ]
     for (θ, ϕ, lab, a) in all_coordinate_labels
         θ = θ |> u"°"
         ϕ = ϕ |> u"°"
         coord_label = "$(lab) axis\nθ = $(round(u"°", θ; digits)) ($(round(u"rad", θ; digits)))\nϕ = $(round(u"°", ϕ; digits)) ($(round(u"rad", ϕ; digits)))"
-        scatter!(ax, ϕ, θ; col_coordinates..., inspectable=true, inspector_label=(plot, index, position) -> coord_label)
-        text!(ax, ϕ, θ; text=lab, col_coordinates..., align=a)
+        scatter!(ax, ϕ, θ; color=COL_COORDS, inspectable=true, inspector_label=(plot, index, position) -> coord_label)
+        text!(ax, ϕ, θ; text=lab, color=COL_COORDS, align=a)
     end
 end
 
-function plot_polar_optical_axes!(ax::Axis, oa; col_r1, col_r2, col_b)
+function plot_polar_optical_axes!(ax::Axis, oa)
     digits = 3
-    colors = [col_r1, col_r2, col_b]
+    colors = [COL_R1, COL_R2, COL_B]
     labels = ["λ_r1", "λ_r2", "λ_b"]
 
-    for (angle, col, lab) in zip(oa, colors, labels)
+    for (angle, color, lab) in zip(oa, colors, labels)
         axis_label = "Optical axis $(lab)\n|θ| = $(round(u"°", angle; digits)) ($(round(u"rad", angle; digits)))\nϕ = $(0.0u"°") ($(0.0u"rad"))"
         scatter!(
             ax,
             [0, 0, π, π, 2π, 2π] .|> u"°",
             [angle, π - angle, angle, π - angle, angle, π - angle] .|> u"°";
-            col..., markersize=8, label=lab,
+            color, markersize=8, label=lab,
             inspectable=true, inspector_label=(plot, index, position) -> axis_label,
         )
     end
@@ -550,37 +565,34 @@ function plot_sphere_mode(
     axis_length::Real,
     show_coordinates::Bool,
     show_optical_axes::Bool,
-    col_coordinates,
-    col_contour,
-    col_r1,
-    col_r2,
-    col_b,
-    col_heatmap,
+    size::NTuple{2,Int}=(800, 600),
 )
-    f = Figure()
+    f = Figure(; size)
+    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(temp |> u"K") ($(float(temp |> u"°C")))"
+    lambda_info = "$(round(u"nm", lambda_r1_r2_b[1]; digits)) (λ_r1, $(hi_or_lo_r1_r2_b[1])) + $(round(u"nm", lambda_r1_r2_b[2]; digits)) (λ_r2, $(hi_or_lo_r1_r2_b[2])) = $(round(u"nm", lambda_r1_r2_b[3]; digits)) (λ_b, $(hi_or_lo_r1_r2_b[3]))"
     ax = Axis3(
         f[1, 1],
         azimuth=0.1π, elevation=0.05π,
         aspect=:data, viewmode=:fit,
-        title="$(round(u"nm", lambda_r1_r2_b[1]; digits)) (λ_r1, $(hi_or_lo_r1_r2_b[1])) + $(round(u"nm", lambda_r1_r2_b[2]; digits)) (λ_r2, $(hi_or_lo_r1_r2_b[2])) = $(round(u"nm", lambda_r1_r2_b[3]; digits)) (λ_b, $(hi_or_lo_r1_r2_b[3]))"
+        title=cr_info * "\n" * lambda_info
     )
     hidedecorations!(ax, grid=false)
 
-    plot_sphere_mesh!(ax, θ_range, ϕ_range, all_delta_k, scale_limit, col_heatmap)
-    plot_sphere_contours!(ax, cpl, col_contour, cr, temp, hi_or_lo_r1_r2_b, lambda_r1_r2_b)
-    plot_sphere_pms!(ax, pms, axis_length; col_r1, col_r2, col_b)
+    plot_sphere_mesh!(ax, θ_range, ϕ_range, all_delta_k, scale_limit)
+    plot_sphere_contours!(ax, cpl, cr, temp, hi_or_lo_r1_r2_b, lambda_r1_r2_b)
+    plot_sphere_pms!(ax, pms, axis_length)
 
     if show_coordinates
-        plot_sphere_coordinates!(ax, axis_length, col_coordinates)
+        plot_sphere_coordinates!(ax, axis_length)
     end
 
     if show_optical_axes
-        plot_sphere_optical_axes!(ax, oa, axis_length; col_r1, col_r2, col_b)
+        plot_sphere_optical_axes!(ax, oa, axis_length)
     end
 
     # Legend(f[1, 2], ax)
     Colorbar(
-        f[1, 2]; col_heatmap...,
+        f[1, 2]; colormap=COLORMAP_HEATMAP,
         limits=(-scale_limit, scale_limit),
         label="Δk in µm⁻¹"
     )
@@ -589,12 +601,12 @@ function plot_sphere_mode(
     return f
 end
 
-function plot_sphere_mesh!(ax::Axis3, θ_range, ϕ_range, all_delta_k, scale_limit, col_heatmap)
+function plot_sphere_mesh!(ax::Axis3, θ_range, ϕ_range, all_delta_k, scale_limit)
     points = [Point3f(angles_to_vector(θ, ϕ)...) for θ in θ_range, ϕ in ϕ_range]
     faces = decompose(QuadFace{GLIndex}, Tessellation(Rect(0, 0, 1, 1), size(all_delta_k)))
     normals = normalize.(vec(points))
     gb_mesh = GeometryBasics.Mesh(vec(points), faces; normal=normals)
-    mesh!(ax, gb_mesh, color=all_delta_k[:]; col_heatmap..., colorrange=(-scale_limit, scale_limit), inspectable=false)
+    mesh!(ax, gb_mesh, color=all_delta_k[:]; colormap=COLORMAP_HEATMAP, colorrange=(-scale_limit, scale_limit), inspectable=false)
 end
 
 function sphere_plot_pm_label(
@@ -614,7 +626,6 @@ end
 function plot_sphere_contours!(
     ax::Axis3,
     cpl,
-    col_contour,
     cr::NonlinearCrystal,
     temp::Temperature,
     hi_or_lo_r1_r2_b::AbstractVector{Symbol},
@@ -627,7 +638,7 @@ function plot_sphere_contours!(
         label_fun = (plot, index, position) -> sphere_plot_pm_label(plot, index, position, cr, temp, hi_or_lo_r1_r2_b, lambda_r1_r2_b)
 
         points = [Point3f(angles_to_vector(θi, ϕi)...) for (θi, ϕi) in zip(θ, ϕ)]
-        lines!(ax, points; col_contour..., linewidth=4, label=(i == 1 ? "Phase matches" : nothing), inspectable=true, inspector_label=label_fun,
+        lines!(ax, points; color=COL_CONTOUR, linewidth=4, label=(i == 1 ? "Phase matches" : nothing), inspectable=true, inspector_label=label_fun,
         )
     end
 end
@@ -635,10 +646,7 @@ end
 function plot_sphere_pms!(
     ax::Axis3,
     pms,
-    axis_length;
-    col_r1,
-    col_r2,
-    col_b
+    axis_length
 )
     fac_r1 = [1 + 2 * (axis_length - 1) / 3, axis_length]
     fac_r2 = [1 + (axis_length - 1) / 3, 1 + 2 * (axis_length - 1) / 3]
@@ -648,7 +656,7 @@ function plot_sphere_pms!(
 
     lambda_labels = ["λ_r1", "λ_r2", "λ_b"]
     factors = [fac_r1, fac_r2, fac_b]
-    colors = [col_r1, col_r2, col_b]
+    colors = [COL_R1, COL_R2, COL_B]
 
     for (i, pm) in enumerate(pms)
         θi_pm = pm.theta_pm
@@ -660,12 +668,12 @@ function plot_sphere_pms!(
         scatter!(ax, axis_length .* ri_pm; markersize=15, label="Probed phase match $(i)", inspectable=true,
             inspector_label=(plot, index, position) -> ("Probed phase match $(i)\n" * plot_pm_label(pm)))
 
-        for (i, (lab, fac, E_dir, col)) in enumerate(zip(lambda_labels, factors, E_dirs, colors))
+        for (i, (lab, fac, E_dir, color)) in enumerate(zip(lambda_labels, factors, E_dirs, colors))
             label_fun = (plot, index, position) -> ("$(lab)")
             lines!(
                 ax,
                 [fac[1] .* ri_pm, fac[2] .* ri_pm];
-                col..., linewidth=4, inspectable=true, inspector_label=label_fun
+                color, linewidth=4, inspectable=true, inspector_label=label_fun
             )
 
             scale = sum(fac) / 2
@@ -674,43 +682,43 @@ function plot_sphere_pms!(
                 scale .* ri_pm[1] .+ len_E_dir .* E_dir[1] .* [-1, +1],
                 scale .* ri_pm[2] .+ len_E_dir .* E_dir[2] .* [-1, +1],
                 scale .* ri_pm[3] .+ len_E_dir .* E_dir[3] .* [-1, +1];
-                col..., linewidth=4, inspectable=true, inspector_label=label_fun
+                color, linewidth=4, inspectable=true, inspector_label=label_fun
             )
         end
     end
 end
 
-function plot_sphere_coordinates!(ax::Axis3, axis_length, col_coordinates)
+function plot_sphere_coordinates!(ax::Axis3, axis_length)
     digits = 3
     coords = [
-        ([-1, 1], [0, 0], [0, 0], "X"),
-        ([0, 0], [-1, 1], [0, 0], "Y"),
-        ([0, 0], [0, 0], [-1, 1], "Z")
+        ([-1, 1], [0, 0], [0, 0], ["-X", "+X"]),
+        ([0, 0], [-1, 1], [0, 0], ["-Y", "+Y"]),
+        ([0, 0], [0, 0], [-1, 1], ["-Z", "+Z"])
     ]
     for (x, y, z, label) in coords
         θ, ϕ = vector_to_angles([x[2], y[2], z[2]])
         θ = θ |> u"°"
         ϕ = ϕ |> u"°"
         coord_label = "$(label) axis\nθ = $(round(u"°", θ; digits)) ($(round(u"rad", θ; digits)))\nϕ = $(round(u"°", ϕ; digits)) ($(round(u"rad", ϕ; digits)))"
-        lines!(ax, axis_length .* x, axis_length .* y, axis_length .* z; col_coordinates..., inspectable=true, inspector_label=(plot, index, position) -> coord_label, linewidth=3)
-        text!(ax, axis_length .* x[2], axis_length .* y[2], axis_length .* z[2]; text=label, col_coordinates...)
-        text!(ax, axis_length .* x[1], axis_length .* y[1], axis_length .* z[1]; text=label, col_coordinates...)
+        lines!(ax, axis_length .* x, axis_length .* y, axis_length .* z; color=COL_COORDS, inspectable=true, inspector_label=(plot, index, position) -> coord_label, linewidth=3)
+        text!(ax, axis_length .* x[2], axis_length .* y[2], axis_length .* z[2]; text=label[2], color=COL_COORDS)
+        text!(ax, axis_length .* x[1], axis_length .* y[1], axis_length .* z[1]; text=label[1], color=COL_COORDS)
     end
 end
 
-function plot_sphere_optical_axes!(ax::Axis3, oa, axis_length; col_r1, col_r2, col_b)
+function plot_sphere_optical_axes!(ax::Axis3, oa, axis_length)
     digits = 3
-    colors = [col_r1, col_r2, col_b]
+    colors = [COL_R1, COL_R2, COL_B]
     labels = ["λ_r1", "λ_r2", "λ_b"]
 
-    for (angle, col, lab) in zip(oa, colors, labels)
+    for (angle, color, lab) in zip(oa, colors, labels)
         axis_label = "Optical axis $(lab)\n|θ| = $(round(u"°", angle; digits)) ($(round(u"rad", angle; digits)))\nϕ = $(0.0u"°") ($(0.0u"rad"))"
         dir_pos = axis_length * Point3f(sin(angle), 0, cos(angle))
         dir_neg = -dir_pos
-        lines!(ax, [dir_neg, dir_pos]; col..., linewidth=4, label="Optical axes " * lab, inspectable=true, inspector_label=(plot, index, position) -> axis_label)
+        lines!(ax, [dir_neg, dir_pos]; color, linewidth=4, label="Optical axes " * lab, inspectable=true, inspector_label=(plot, index, position) -> axis_label)
 
         dir_pos_neg = axis_length * Point3f(sin(-angle), 0, cos(-angle))
         dir_neg_neg = -dir_pos_neg
-        lines!(ax, [dir_neg_neg, dir_pos_neg]; col..., linewidth=4, inspectable=true, inspector_label=(plot, index, position) -> axis_label)
+        lines!(ax, [dir_neg_neg, dir_pos_neg]; color, linewidth=4, inspectable=true, inspector_label=(plot, index, position) -> axis_label)
     end
 end

@@ -237,10 +237,10 @@ function plot_single_noncritical_pm!(
     return ax
 end
 
-function plot_noncritical_pm(
+function plot_noncritical_pms(
     principal_axis::Symbol,
     cr::NonlinearCrystal;
-    hi_or_lo_r1_r2_b::Union{AbstractVector{Symbol}, Nothing}=nothing,
+    hi_or_lo_r1_r2_b::Union{AbstractVector{Symbol}, AbstractVector{<:AbstractVector{Symbol}}, Nothing}=nothing,
     lambda_b_min::Union{Nothing,Length}=nothing,
     lambda_b_max::Union{Nothing,Length}=nothing,
     lambda_r12_min::Union{Nothing,Length}=nothing,
@@ -261,10 +261,14 @@ function plot_noncritical_pm(
         dim2_conversion=uc,
     )
 
-    all_hi_or_lo_r1_r2_b = isnothing(hi_or_lo_r1_r2_b) ? bool_permutations(:hi, :lo, 3) : [hi_or_lo_r1_r2_b] # TODO: Only iterate promising polarization combinations
-    setdiff!(all_hi_or_lo_r1_r2_b, [[:hi, :lo, :lo], [:hi, :lo, :hi], [:lo, :lo, :lo], [:hi, :hi, :hi]]) # Prevent double plotting of Type 2 noncritical phasematches and unphysical phasematches 
+    if isnothing(hi_or_lo_r1_r2_b)
+        hi_or_lo_r1_r2_b = bool_permutations(:hi, :lo, 3)
+        setdiff!(hi_or_lo_r1_r2_b, [[:hi, :lo, :lo], [:hi, :lo, :hi], [:lo, :lo, :lo], [:hi, :hi, :hi]]) # Prevent double plotting of Type 2 noncritical phasematches and unphysical phasematches 
+    elseif typeof(hi_or_lo_r1_r2_b) <: AbstractVector{Symbol}
+        hi_or_lo_r1_r2_b = [hi_or_lo_r1_r2_b]
+    end
 
-    for hl in all_hi_or_lo_r1_r2_b
+    for hl in hi_or_lo_r1_r2_b
         plot_single_noncritical_pm!(
             ax, 
             principal_axis,

@@ -4,6 +4,7 @@ using StaticArrays
 using LinearAlgebra 
 using Unitful 
 using Roots 
+using NearestNeighbors
 using GLMakie 
 using GeometryBasics
 
@@ -13,6 +14,14 @@ import PhysicalConstants.CODATA2022: c_0, ε_0
 import Unitful: Temperature, Length, Frequency
 @derived_dimension Angle  Unitful.𝐋^0  true # Used to force explicit angle units
 
+# Color defaults
+COL_COORDS = to_colormap(:Greys)[5]
+COL_CONTOUR = to_colormap(:Set1_9)[2]
+COL_R1 = to_colormap(:vik10)[9]
+COL_R2 = to_colormap(:vik10)[8]
+COL_B = to_colormap(:vik10)[3]
+
+# Includes
 include("utils.jl")
 include("refractive_index.jl")
 include("crystal_symmetry.jl")

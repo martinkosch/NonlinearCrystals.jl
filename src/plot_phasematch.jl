@@ -133,6 +133,10 @@ function calc_noncritical_pm_lines(
     # If both red waves are polarized equally (type 1 phasematching), the plot lines show a helpful phase match symmetry around the line cont_r_raw = 2 * cont_b_raw
     is_type_one = (hi_or_lo_r1_r2_b[1] == hi_or_lo_r1_r2_b[2])
 
+    all_segments_r = []
+    all_segments_b = []
+    all_cb_intersections = []
+    all_cr_intersections = []
     # Iterate over all identified raw contour lines and postprocess/refine them
     for cl in cpl.lines
         cont_b_raw = [v[1] for v in cl.vertices]
@@ -152,6 +156,10 @@ function calc_noncritical_pm_lines(
                 # Flip lower (r2) parts to upper (r1) half using phase match symmetry
                 segments_cr = [segment_signs[i] < 0.0 ? 1 ./ (1 ./ segments_cb[i] - 1 ./ segments_cr[i]) : segments_cr[i] for i in eachindex(segments_cr)]
             end
+            push!(all_segments_r, segments_cr)
+            push!(all_segments_b, segments_cb)
+            push!(all_cb_intersections, cb_intersections)
+            push!(all_cr_intersections, cr_intersections)
 
             # for i in eachindex(segments_cb)
             #     for p in eachindex(segments_cb[i])
@@ -162,7 +170,7 @@ function calc_noncritical_pm_lines(
             #             lambda_r2=nothing,
             #             lambda_b=segments_cb[i][p],
             #             temp,
-            #             principal_axes=principal_axis,
+            #             principal_axis=principal_axis,
             #         )
             #         if isnothing(pm)
             #             pop!(segments_cb[i][p])
@@ -174,10 +182,10 @@ function calc_noncritical_pm_lines(
             #     end
             # end
 
-            for i in eachindex(segments_cb)
-                lines!(segments_cb[i], segments_cr[i])
-            end
-            !isempty(cb_intersections) && scatter!(cb_intersections, cr_intersections)
+            # for i in eachindex(segments_cb)
+            #     lines!(segments_cb[i], segments_cr[i])
+            # end
+            # !isempty(cb_intersections) && scatter!(cb_intersections, cr_intersections)
 
             # if !isempty(sign_switches)
             #     scatter!(cont_b[sign_switches], cont_r[sign_switches] .- 2 * cont_b[sign_switches])
@@ -185,10 +193,116 @@ function calc_noncritical_pm_lines(
             # lines!(cont_b, 1 ./ (1 ./ cont_b - 1 ./ cont_r))
         end
     end
+    all_segments_b = reduce(vcat, all_segments_b)
+    all_segments_r = reduce(vcat, all_segments_r)
+    all_cb_intersections = reduce(vcat, all_cb_intersections)
+    all_cr_intersections = reduce(vcat, all_cr_intersections)
+    return all_segments_b, all_segments_r, all_cb_intersections, all_cr_intersections
 end
 
+# function find_sorted_segments(sorted_indices)
+#     segments = []
+#     visited = falses(length(sorted_indices))
 
-function calc_raw_noncritical_pm_points(
+#     for i in eachindex(sorted_indices)
+#         if !visited[i]
+#             segment = [i]
+#             visited[i] = true
+
+#             # Forward traversal
+#             current = i
+#             while true
+#                 next_idx = findfirst(n -> !visited[n], sorted_indices[current])
+#                 isnothing(next_idx) && break
+#                 current = sorted_indices[current][next_idx]
+#                 push!(segment, current)
+#                 visited[current] = true
+#             end
+
+#             # Backward traversal
+#             current = i
+#             while true
+#                 prev_point = nothing
+#                 for neighbor in sorted_indices[current]
+#                     if !visited[neighbor] && (current in sorted_indices[neighbor])
+#                         prev_point = neighbor
+#                         break
+#                     end
+#                 end
+#                 isnothing(prev_point) && break
+#                 prepend!(segment, prev_point)
+#                 visited[prev_point] = true
+#                 current = prev_point
+#             end
+
+#             push!(segments, segment)
+#         end
+#     end
+
+#     return segments
+# end
+
+# function calc_raw_noncritical_pm_points(
+#     principal_axis::Symbol,
+#     hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+#     cr::NonlinearCrystal;
+#     lambda_b_min::Union{Nothing,Length}=nothing,
+#     lambda_b_max::Union{Nothing,Length}=nothing,
+#     lambda_r12_min::Union{Nothing,Length}=nothing,
+#     lambda_r12_max::Union{Nothing,Length}=nothing,
+#     temp::Temperature=default_temp(cr),
+#     ngrid=50,
+#     tol=1e-14u"nm^-1",
+# )
+#     @assert principal_axis in [:X, :Y, :Z]
+#     @assert ngrid >= 2 "The grid must contain at least two points."
+
+#     isnothing(lambda_b_min) && (lambda_b_min = valid_lambda_range(cr)[1])
+#     isnothing(lambda_b_max) && (lambda_b_max = valid_lambda_range(cr)[2] / 2)
+#     isnothing(lambda_r12_min) && (lambda_r12_min = valid_lambda_range(cr)[1])
+#     isnothing(lambda_r12_max) && (lambda_r12_max = valid_lambda_range(cr)[2])
+
+#     range_lambda_b = LinRange(lambda_b_min, lambda_b_max, ngrid)
+#     all_pms_b = typeof(lambda_b_min)[]
+#     all_pms_r1 = typeof(lambda_b_min)[]
+#     all_pms_r2 = typeof(lambda_b_min)[]
+#     for lambda_b in range_lambda_b
+#         pms = find_all_pms_along_dimension(hi_or_lo_r1_r2_b, cr; lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, principal_axis, ngrid, tol)
+#         for pm in pms
+#             # if true#pm.lambda_r1_r2_b[2] < pm.lambda_r1_r2_b[1]
+#             push!(all_pms_b, lambda_b)
+#             push!(all_pms_r1, pm.lambda_r1_r2_b[1])
+#             push!(all_pms_r2, pm.lambda_r1_r2_b[2])
+#             # end
+#         end
+#     end
+
+#     range_lambda_r1 = lambda_r12_min:step(range_lambda_b):lambda_r12_max
+#     for lambda_r1 in range_lambda_r1
+#         pms = find_all_pms_along_dimension(hi_or_lo_r1_r2_b, cr; lambda_r1_fixed=lambda_r1, temp_min=temp, temp_max=temp, principal_axis, ngrid, tol)
+#         for pm in pms
+#             # if true#pm.lambda_r1_r2_b[2] < lambda_r1
+#             push!(all_pms_b, pm.lambda_r1_r2_b[3])
+#             push!(all_pms_r1, lambda_r1)
+#             push!(all_pms_r2, pm.lambda_r1_r2_b[2])
+#             # end
+#         end
+#     end
+
+#     # @show step(range_lambda_b)
+#     # @show indices_within_d, dists_within_d = find_neighbors_within_distance(all_pms_b, all_pms_r1, (1 + 1e-4) * sqrt(2) * step(range_lambda_b)) 
+#     # segments = find_sorted_segments(indices_within_d)
+
+#     # all_dir_r1_b = [reverse(delta_k_gradient_r1_b(principal_axis, hi_or_lo_r1_r2_b, cr; lambda_r1=all_pms_r1[i], lambda_b=all_pms_b[i])) .* [1, -1] for i in eachindex(all_pms_b)]
+
+#     # idx = sortperm(all_pms_b)
+#     # all_pms_b = all_pms_b[idx]
+#     # all_pms_r1 = all_pms_r1[idx]
+#     # all_pms_r2 = all_pms_r2[idx]
+#     return all_pms_b, all_pms_r1, all_pms_r2
+# end
+
+function plot_single_noncritical_pm(
     principal_axis::Symbol,
     hi_or_lo_r1_r2_b::AbstractVector{Symbol},
     cr::NonlinearCrystal;
@@ -200,46 +314,100 @@ function calc_raw_noncritical_pm_points(
     ngrid=50,
     tol=1e-14u"nm^-1",
 )
-    @assert principal_axis in [:X, :Y, :Z]
+    all_segments_b, all_segments_r1, all_cb_intersections, all_cr_intersections = calc_noncritical_pm_lines(
+        principal_axis,
+        hi_or_lo_r1_r2_b,
+        cr;
+        lambda_b_min,
+        lambda_b_max,
+        lambda_r12_min,
+        lambda_r12_max,
+        temp,
+        ngrid,
+    )
 
-    isnothing(lambda_b_min) && (lambda_b_min = valid_lambda_range(cr)[1])
-    isnothing(lambda_b_max) && (lambda_b_max = valid_lambda_range(cr)[2] / 2)
-    isnothing(lambda_r12_min) && (lambda_r12_min = valid_lambda_range(cr)[1])
-    isnothing(lambda_r12_max) && (lambda_r12_max = valid_lambda_range(cr)[2])
+    f = Figure(size=(1000, 800))
+    uc = Makie.UnitfulConversion(u"µm"; units_in_label=true)
+    ax = Axis(
+        f[1, 1],
+        xlabel="λ_b",
+        ylabel="λ_r12",
+        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, polarization directions: $(hi_or_lo_r1_r2_b)", # TODO: Add lambda names and o/e
+        dim1_conversion=uc,
+        dim2_conversion=uc,
+    )
 
-    range_lambda_b = LinRange(lambda_b_min, lambda_b_max, ngrid) .|> u"µm"
-    all_pms_b = typeof(lambda_b_min)[]
-    all_pms_r1 = typeof(lambda_b_min)[]
-    all_pms_r2 = typeof(lambda_b_min)[]
-    for lambda_b in range_lambda_b
-        pms = find_all_pms_along_dimension(hi_or_lo_r1_r2_b, cr; lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, principal_axes=principal_axis, ngrid, tol)
-        for pm in pms
-            if pm.lambda_r1_r2_b[2] < pm.lambda_r1_r2_b[1]
-                push!(all_pms_b, lambda_b)
-                push!(all_pms_r1, pm.lambda_r1_r2_b[1])
-                push!(all_pms_r2, pm.lambda_r1_r2_b[2])
-            end
-        end
+    vline_lab = (plot, idx, pos) -> begin
+        pos = pos * u"µm"
+        marker_x[] = [ustrip(u"µm", pos[1])]
+        marker_x_b[] = [pos[1]]
+        is_r1 = pos[2] > 2 * pos[1]
+        marker_y_r1[] = is_r1 ? [pos[2]] : [1 / (1 / pos[1] - 1 / pos[2])]
+        marker_y_r2[] = is_r1 ? [1 / (1 / pos[1] - 1 / pos[2])] : [pos[2]]
+
+        pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_r1_r2_b, cr; lambda_r1=marker_y_r1[][1], lambda_b=marker_x_b[][1], temp, principal_axis, ngrid, tol)
+        return plot_pm_label(pm)
     end
 
-    range_lambda_r1 = LinRange(lambda_r12_min, lambda_r12_max, 2 * ngrid) .|> u"µm"
-    for lambda_r1 in range_lambda_r1
-        pms = find_all_pms_along_dimension(hi_or_lo_r1_r2_b, cr; lambda_r1_fixed=lambda_r1, temp_min=temp, temp_max=temp, principal_axes=principal_axis, ngrid, tol)
-        for pm in pms
-            if pm.lambda_r1_r2_b[2] < lambda_r1
-                push!(all_pms_b, pm.lambda_r1_r2_b[3])
-                push!(all_pms_r1, lambda_r1)
-                push!(all_pms_r2, pm.lambda_r1_r2_b[2])
-            end
-        end
+    shg_lab = (plot, idx, pos) -> begin
+        pos = pos * u"µm"
+        pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_r1_r2_b, cr; lambda_r1=pos[2], lambda_b=pos[1], temp, principal_axis, ngrid, tol)
+        return "SHG point\n" * plot_pm_label(pm)
     end
-    
-    idx = sortperm(all_pms_b)
-    all_pms_b = all_pms_b[idx]
-    all_pms_r1 = all_pms_r1[idx]
-    all_pms_r2 = all_pms_r2[idx]
-    return all_pms_b, all_pms_r1, all_pms_r2
+
+    vline_clear = (inspector, plot) -> begin
+        marker_x[] = [NaN]
+        marker_x_b[] = [NaN * u"µm"]
+        marker_y_r1[] = [NaN * u"µm"]
+        marker_y_r2[] = [NaN * u"µm"]
+        return nothing
+    end
+
+    [lines!(ax, all_segments_b[i], all_segments_r1[i], color=COL_R1, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
+    [lines!(ax, all_segments_b[i], 1 ./ (1 ./ all_segments_b[i] .- 1 ./ all_segments_r1[i]), color=COL_R2, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
+    scatter!(ax, all_cb_intersections, all_cr_intersections; inspectable=true, inspector_label=shg_lab)
+
+    marker_x = Observable([NaN]) # Workaround: vlines! is not yet compatible with unit observables
+    marker_x_b = Observable([NaN * u"µm"])
+    marker_y_r1 = Observable([NaN * u"µm"])
+    marker_y_r2 = Observable([NaN * u"µm"])
+    vlines!(ax, marker_x; inspectable=false, color=:gray, linewidth=2, alpha=0.5)
+    scatter!(ax, marker_x_b, marker_y_r1; inspectable=false, color=COL_R1)
+    scatter!(ax, marker_x_b, marker_y_r2; inspectable=false, color=COL_R2)
+
+    DataInspector(f)
+
+    return f
 end
+
+# function on_hover(inspector)
+#     parent = inspector.root
+#     (inspector.attributes.enabled[] && is_mouseinside(parent)) || return Consume(false)
+
+#     mp = mouseposition_px(parent)
+#     should_clear = true
+#     for (plt, idx) in pick_sorted(parent, mp, inspector.attributes.range[])
+#         if to_value(get(plt.attributes, :inspectable, true))
+#             # show_data should return true if it created a tooltip
+#             if show_data_recursion(inspector, plt, idx)
+#                 should_clear = false
+#                 break
+#             end
+#         end
+#     end
+
+#     if should_clear
+#         plot = inspector.selection
+#         if to_value(get(plot, :inspector_clear, automatic)) !== automatic
+#             plot[:inspector_clear][](inspector, plot)
+#         end
+#         inspector.plot.visible[] = false
+#         inspector.attributes.indicator_visible[] = false
+#         inspector.plot.offset.val = inspector.attributes.offset[]
+#     end
+
+#     return Consume(false)
+# end
 
 function plot_single_noncritial_pm!(
     ax::Axis,

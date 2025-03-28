@@ -31,7 +31,7 @@ function draw_ellipsoid!(
     principal_axes::AbstractVector=[1.0, 1.0, 1.0];
     kwargs...,
 )
-    s = Sphere(Point3f(center...), 1f0)
+    s = Sphere(Point3f(center...), 1.0f0)
 
     meshplot = mesh!(ax, s, alpha=0.3, transparency=true)
     scale!(meshplot, principal_axes...)
@@ -55,14 +55,14 @@ function angles_to_vector(theta::Angle, phi::Angle)
     return @SVector [x, y, z]
 end
 
-function axes_to_θ_ϕ(axes::Union{AbstractVector{Symbol}, Symbol})
+function axes_to_θ_ϕ(axes::Union{AbstractVector{Symbol},Symbol})
     axes = (axes isa Symbol) ? [axes] : axes
     θ_ϕ_dirs = map(axes) do a
         if a == :X
             return (90u"°", 0u"°")
-        elseif a==:Y
+        elseif a == :Y
             return (90u"°", 90u"°")
-        elseif a==:Z
+        elseif a == :Z
             return (0u"°", 0u"°")
         else
             @error "Axis '$(a)' unknown. Valid options are ':X', ':Y', and ':Z'."
@@ -76,7 +76,7 @@ function bool_permutations(val1, val2, n::Integer)
     result = []
 
     # Iterate over all possible 2^n combinations
-    for i in 0:(2^n - 1)
+    for i in 0:(2^n-1)
         perm = Vector{typeof(val1)}(undef, n)
         for j in 1:n
             # Choose val1 or val2 based on bit pattern
@@ -94,8 +94,8 @@ end
 
 function eigen_2d(A::AbstractMatrix)
     (a, b, c, d) = A'
-    discr = sqrt(max(0.0, ((a + d)/2)^2 - (a * d - b * c))) # Bound from below to avoid numerical issues
-    eigvals = (a + d)/2 .+ [-discr, discr]
+    discr = sqrt(max(0.0, ((a + d) / 2)^2 - (a * d - b * c))) # Bound from below to avoid numerical issues
+    eigvals = (a + d) / 2 .+ [-discr, discr]
 
     eigvecs_orth1 = [[b, eigvals[1] - a], [eigvals[1] - d, c]]
     idx_ev1 = findmax(norm.(eigvecs_orth1))[2]
@@ -111,7 +111,7 @@ function shift_lambda_with_freq(lambda::Length, delta_omega::Frequency)
     return lambda_shifted
 end
 
-function split_on_nan(x::AbstractVector{T}, y::AbstractVector{T}) where T
+function split_on_nan(x::AbstractVector{T}, y::AbstractVector{T}) where {T}
     @assert length(x) == length(y) "Vectors must be the same length"
 
     segments_x = Vector{T}[]
@@ -169,4 +169,24 @@ function sign_switch_fractions(vec::AbstractVector)
     push!(segment_signs, sign(vec[prev_idx]))
 
     return sign_switches, fractions, segment_signs
+end
+
+function find_neighbors_within_distance(all_x, all_y, d)
+    # Combine vectors into a 2D points matrix
+    points = hcat(all_x, all_y)'
+    points = ustrip.(Unitful.unit(d), points)
+
+    # Create a k-d tree for fast neighbor search
+    tree = KDTree(points)
+
+    # Find neighbors within threshold distance for all points
+    indices_within_d = [Int[] for i in eachindex(all_x)]
+    dists_within_d = [typeof(d)[] for i in eachindex(all_x)]
+    for i in eachindex(all_x)
+        idxs, dists = knn(tree, points[:, i], 6, true)
+        append!(indices_within_d[i], idxs[dists .<= ustrip(d)])
+        append!(dists_within_d[i], dists[dists .<= ustrip(d)] * Unitful.unit(d))
+    end
+
+    return indices_within_d, dists_within_d
 end

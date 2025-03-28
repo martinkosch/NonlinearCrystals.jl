@@ -650,7 +650,9 @@ function _pms_vs_lambda_r1(θ_ϕs, hi_or_lo_r1_r2_b, cr, λb, temp, λmin, λmax
                 fun = λr1 -> delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=λr1, lambda_b=λb, temp=temp)
                 λr1_sol = find_zero(fun, (λr1_range[i], λr1_range[i+1]), Bisection(), atol=tol)
                 λr2_sol = 1 / (1 / λb - 1 / λr1_sol)
-                push!(pms, CollinearPhaseMatch(cr, [λr1_sol, λr2_sol, λb], temp, hi_or_lo_r1_r2_b, θ_ϕ...))
+
+                all_λ_sol = λr1_sol < λr2_sol ? [λr2_sol, λr1_sol, λb] : [λr1_sol, λr2_sol, λb] # Sort red lambdas, so that λ_r1 is the larger one
+                push!(pms, CollinearPhaseMatch(cr, all_λ_sol, temp, hi_or_lo_r1_r2_b, θ_ϕ...))
             end
         end
     end

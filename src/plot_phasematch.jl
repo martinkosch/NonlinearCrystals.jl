@@ -171,7 +171,7 @@ function calc_noncritical_pm_lines(
 end
 
 function plot_single_noncritical_pm!(
-    ax::Axis, 
+    ax::Axis,
     principal_axis::Symbol,
     hi_or_lo_r1_r2_b::AbstractVector{Symbol},
     cr::NonlinearCrystal;
@@ -183,7 +183,7 @@ function plot_single_noncritical_pm!(
     ngrid=50,
     tol=1e-14u"nm^-1",
 )
-    is_type_1 = hi_or_lo_r1_r2_b[1]===hi_or_lo_r1_r2_b[2]
+    is_type_1 = hi_or_lo_r1_r2_b[1] === hi_or_lo_r1_r2_b[2]
 
     all_segments_b, all_segments_r1, all_cb_intersections, all_cr_intersections = calc_noncritical_pm_lines(
         principal_axis,
@@ -205,7 +205,7 @@ function plot_single_noncritical_pm!(
         marker_y_r1[] = is_r1 ? [pos[2]] : [1 / (1 / pos[1] - 1 / pos[2])]
         marker_y_r2[] = is_r1 ? [1 / (1 / pos[1] - 1 / pos[2])] : [pos[2]]
 
-        pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_r1_r2_b, cr; lambda_r1=marker_y_r1[][1], lambda_b=marker_x_b[][1], temp, principal_axis, ngrid, tol)
+        pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_r1_r2_b, cr; lambda_r1=marker_y_r1[][1], lambda_b=pos[1], temp, principal_axis, ngrid, tol)
         return "$(is_type_1 ? "Type 1" : "Type 2") noncritical phasematch\n" * plot_pm_label(pm)
     end
 
@@ -240,7 +240,7 @@ end
 function plot_noncritical_pms(
     principal_axis::Symbol,
     cr::NonlinearCrystal;
-    hi_or_lo_r1_r2_b::Union{AbstractVector{Symbol}, AbstractVector{<:AbstractVector{Symbol}}, Nothing}=nothing,
+    hi_or_lo_r1_r2_b::Union{AbstractVector{Symbol},AbstractVector{<:AbstractVector{Symbol}},Nothing}=nothing,
     lambda_b_min::Union{Nothing,Length}=nothing,
     lambda_b_max::Union{Nothing,Length}=nothing,
     lambda_r12_min::Union{Nothing,Length}=nothing,
@@ -271,7 +271,7 @@ function plot_noncritical_pms(
 
     for hl in hi_or_lo_r1_r2_b
         plot_single_noncritical_pm!(
-            ax, 
+            ax,
             principal_axis,
             hl,
             cr;
@@ -430,7 +430,7 @@ function plot_polar_mode(
         f[1, 1],
         xlabel="ϕ",
         ylabel="θ",
-        title=title=cr_info * "\n" * lambda_info
+        title=title = cr_info * "\n" * lambda_info
     )
 
     heatmap!(ax, ϕ_range .|> u"°", θ_range .|> u"°", all_delta_k'; colormap=COLORMAP_HEATMAP, colorrange=(-scale_limit, scale_limit), inspectable=false)

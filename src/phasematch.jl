@@ -53,13 +53,12 @@ function CollinearPhaseMatch(
     beta_3_r1_r2_b = select_hi_lo([d[10] for d in data_hi_lo])
 
     # Assert that the signs of all field direction vectors (until here chosen randomly) are unified, e.g. all high-index directions point in the same direction 
-    k = angles_to_vector(theta_pm, phi_pm)
     first_optical_axis_b = angles_to_vector(optical_axis_angle(cr, lambda_r1_r2_b[3], temp), 0.0u"°")
-    unified_dir_signs = calc_unified_dir_signs(E_dir_r1_r2_b, k, first_optical_axis_b)
+    unified_dir_signs = calc_unified_dir_signs(E_dir_r1_r2_b, S_dir_r1_r2_b[3], first_optical_axis_b)
     D_dir_r1_r2_b = unified_dir_signs .* D_dir_r1_r2_b
     E_dir_r1_r2_b = unified_dir_signs .* E_dir_r1_r2_b
 
-    o_or_e_r1_r2_b = assign_e_o(E_dir_r1_r2_b, cr, use_o_e_for_biaxial=true)
+    o_or_e_r1_r2_b = assign_e_o(E_dir_r1_r2_b, cr; use_o_e_for_biaxial=true)
 
     d_eff = calc_d_eff(cr, E_dir_r1_r2_b...)
     S_0 = (ε_0 * c_0 * lambda_r1_r2_b[1] * lambda_r1_r2_b[2] * prod(refractive_index_r1_r2_b)) / (8 * π^2 * d_eff^2)
@@ -96,14 +95,16 @@ end
 
 function calc_unified_dir_signs(
     dir_vecs_r1_r2_b::AbstractVector{<:AbstractVector{<:Number}},
-    k::AbstractVector{<:Number},
+    S_dir_b::AbstractVector{<:Number},
     first_optical_axis_b::AbstractVector{<:Number}
 )
     # TODO: Check this and the signs of d_eff at opposite hemispheres
-    # Use the first optical axis of the blue beam to define the blue polarization direction sign; this is supposed to prevent sign jumps, e.g. in d_eff
-    sign_b = sign(dot(dir_vecs_r1_r2_b[3], first_optical_axis_b))
+    # This sign correction is supposed to prevent sign jumps, e.g. in d_eff
+    d_b_oa = dot(dir_vecs_r1_r2_b[3], first_optical_axis_b)
+    d_b_ref = dot(dir_vecs_r1_r2_b[3], cross(S_dir_b, first_optical_axis_b))
+    sign_b = (abs(d_b_oa) > abs(d_b_ref)) ? sign(d_b_oa) : sign(d_b_ref)
     
-    dir_ref = cross(dir_vecs_r1_r2_b[3], k)
+    dir_ref = cross(dir_vecs_r1_r2_b[3], S_dir_b)
     d_r1_ref = dot(dir_ref, dir_vecs_r1_r2_b[1])
     d_r1_b = dot(dir_vecs_r1_r2_b[3], dir_vecs_r1_r2_b[1])
     d_r2_ref = dot(dir_ref, dir_vecs_r1_r2_b[2])
@@ -144,7 +145,7 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     else
         println(io, "Wavelengths: λ_r1: $(round(u"nm", cpm.lambda_r1_r2_b[1]; digits)) ($(cpm.hi_or_lo_r1_r2_b[1])) + λ_r2: $(round(u"nm", cpm.lambda_r1_r2_b[2]; digits)) ($(cpm.hi_or_lo_r1_r2_b[2])) = λ_b: $(round(u"nm", cpm.lambda_r1_r2_b[3]; digits)) ($(cpm.hi_or_lo_r1_r2_b[3]))")
     end
-    println(io, "Temperature: $(cpm.temp |> u"K") ($(float(cpm.temp |> u"°C")))")
+    println(io, "Temperature: $(float(cpm.temp |> u"K")) ($(float(cpm.temp |> u"°C")))")
     println(io, "θ: $(round(u"°", cpm.theta_pm |> u"°"; digits)), ϕ: $(round(u"°", cpm.phi_pm |> u"°"; digits))")
     println(io, "Walkoff: $(round(u"mrad", cpm.walkoff_angle_r1_r2_b[1] |> u"mrad"; digits)), $(round(u"mrad", cpm.walkoff_angle_r1_r2_b[2] |> u"mrad"; digits)), $(round(u"mrad", cpm.walkoff_angle_r1_r2_b[3] |> u"mrad"; digits))")
     println(io, "Refractive index: $(round(cpm.refractive_index_r1_r2_b[1]; digits)), $(round(cpm.refractive_index_r1_r2_b[2]; digits)), $(round(cpm.refractive_index_r1_r2_b[3]; digits))")
@@ -160,7 +161,7 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     println(io, "θ_bandwidth * L: $(round(u"mrad * cm", cpm.theta_L_bw; digits))")
     println(io, "ϕ_bandwidth * L: $(round(u"mrad * cm", cpm.phi_L_bw; digits))")
     println(io, "E_dir: $(round.(cpm.E_dir_r1_r2_b[1]; digits)), $(round.(cpm.E_dir_r1_r2_b[2]; digits)), $(round.(cpm.E_dir_r1_r2_b[3]; digits))")
-    # println(io, "D_dir: $(round.(cpm.D_dir_r1_r2_b[1]; digits)), $(round.(cpm.D_dir_r1_r2_b[2]; digits)), $(round.(cpm.D_dir_r1_r2_b[3]; digits))")
+    println(io, "D_dir: $(round.(cpm.D_dir_r1_r2_b[1]; digits)), $(round.(cpm.D_dir_r1_r2_b[2]; digits)), $(round.(cpm.D_dir_r1_r2_b[3]; digits))")
     # println(io, "E_dir_angles: $(round.(u"°", vector_to_angles(cpm.E_dir_r1_r2_b[1]); digits)), $(round.(u"°", vector_to_angles(cpm.E_dir_r1_r2_b[2]); digits)), $(round.(u"°", vector_to_angles(cpm.E_dir_r1_r2_b[3]); digits))")
     # println(io, "D_dir_angles: $(round.(u"°", vector_to_angles(cpm.D_dir_r1_r2_b[1]); digits)), $(round.(u"°", vector_to_angles(cpm.D_dir_r1_r2_b[2]); digits)), $(round.(u"°", vector_to_angles(cpm.D_dir_r1_r2_b[3]); digits))")
 end
@@ -218,28 +219,6 @@ function delta_k(
     n_b = hi_or_lo_r1_r2_b[3] == :hi ? refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_b, temp; n_hi_lo_only=true)[1] : refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_b, temp; n_hi_lo_only=true)[2]
 
     return 2π * (n_r1 / lambda_r1 + n_r2 / lambda_r2 - n_b / lambda_b)
-end
-
-function delta_k_gradient_r1_b(
-    principal_axis::Symbol,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
-    cr::NonlinearCrystal;
-    lambda_r1::Union{Nothing,Length}=nothing,
-    lambda_r2::Union{Nothing,Length}=nothing,
-    lambda_b::Union{Nothing,Length}=nothing,
-    temp::Temperature=default_temp(cr),
-)
-    θ_ϕ_principal_axes = axes_to_θ_ϕ(principal_axis)[1]
-    gradient = ForwardDiff.gradient(
-        (x)->ustrip(u"m^-1", delta_k(θ_ϕ_principal_axes..., hi_or_lo_r1_r2_b, cr; lambda_r1=x[1] * u"µm", lambda_b=x[2] * u"µm")), 
-        ustrip.([lambda_r1, lambda_b] .|> u"µm")
-    ) 
-    return gradient .* u"µm^-1 * m^-1"
-    # gradient = ForwardDiff.gradient(
-    #     (x)->ustrip(u"m^-1", delta_k(θ_ϕ_principal_axes..., hi_or_lo_r1_r2_b, cr; lambda_r1=x[1] * u"µm", lambda_r2=x[2] * u"µm", lambda_b=x[3] * u"µm", temp=x[4] * u"K")), 
-    #     ustrip.([lambda_r1 |> u"µm", lambda_r2 |> u"µm", lambda_b |> u"µm", temp |> u"K"])
-    # ) 
-    # return gradient .* [u"µm^-1 * m^-1", u"µm^-1 * m^-1", u"µm^-1 * m^-1", u"K^-1 * m^-1"]
 end
 
 function delta_k_with_shifting(

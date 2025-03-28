@@ -1,4 +1,4 @@
-export SellmeierFunction, refractive_index, group_index, phase_velocity, group_velocity, β0, β1, β2, β3, plot_refractiveindex, plot_refractiveindex!
+export SellmeierFunction, refractive_index, group_index, phase_velocity, group_velocity, β0, β1, β2, β3, dn_dtemp, plot_refractiveindex, plot_refractiveindex!
 
 # Type piracy: Solve ambiguity during automatic differentiation with units # TODO: Is this always correct? Is there a cleaner way?
 Base.convert(::Type{ForwardDiff.Dual{T,V,N}}, x::Quantity) where {N,V,T} = uconvert(Unitful.NoUnits, x)
@@ -70,29 +70,31 @@ function group_velocity(ri::RefractiveIndex, lambda::Length, temp::Temperature=r
     return 1 / β1(ri, lambda, temp) |> u"m/s"
 end
 
+function dn_dtemp(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+    return ForwardDiff.derivative(
+        t -> ustrip(refractive_index(ri, lambda, t * 1u"K")),
+        ustrip(u"K", temp)
+    ) * 1u"K^-1"
+end
 
-# Sellmeier equation: n = f1(λ,T), dn_dT = f2(λ,T)
-# Functions f1 and f2 must be selected to match the final evaluation of the refractive index according to: n(λ,T) = f1(λ,T) + f2(λ,T) * (T - temp_ref) 
-struct SellmeierFunction{FL,LR,TF,FT,TR} <: RefractiveIndex
+
+struct SellmeierFunction{FL,LR,TF,TR} <: RefractiveIndex
     n_fun::FL
     lambda_range::LR
     temp_ref::TF
-    dn_dtemp_fun::FT
     temp_range::TR
 
     function SellmeierFunction(
         n_fun::Function,
         lambda_range::Union{Nothing,Tuple{Unitful.Length,Unitful.Length}}=nothing;
         temp_ref=293.15u"K",
-        dn_dtemp_fun::Function=(λ, T) -> 0.0u"K^-1",
         temp_range::Union{Nothing,Tuple{Unitful.Temperature,Unitful.Temperature}}=nothing,
     )
         temp_ref = temp_ref |> u"K"
-        return new{eltype(n_fun),typeof(lambda_range),typeof(temp_ref),typeof(dn_dtemp_fun),typeof(temp_range)}(
+        return new{eltype(n_fun),typeof(lambda_range),typeof(temp_ref),typeof(temp_range)}(
             n_fun,
             lambda_range,
             temp_ref,
-            dn_dtemp_fun,
             temp_range
         )
     end
@@ -124,7 +126,7 @@ function refractive_index(
         end
     end
 
-    return uconvert(Unitful.NoUnits, sri.n_fun(lambda, temp) + sri.dn_dtemp_fun(lambda, temp) * (temp - sri.temp_ref))
+    return uconvert(Unitful.NoUnits, sri.n_fun(lambda, temp))
 end
 
 ## Plots
@@ -165,6 +167,6 @@ function plot_refractiveindex!(
     for (i, Ti) in enumerate(temp)
         ris = refractive_index.(ri, λs, Ti)
         inspector_label = (plot, index, position) -> label * "\nλ=$(round(u"µm", position[1] * u"µm"; digits))\nn=$(round(position[2]; digits))\nT = $(Ti)"
-        lines!(λs, ris; label=label * "T = $(Ti)", color=i, colormap, colorrange=(1, length(temp)+2), inspectable=true, inspector_label)
+        lines!(λs, ris; label=label * "T = $(Ti)", color=i, colormap, colorrange=(1, length(temp) + 2), inspectable=true, inspector_label)
     end
 end

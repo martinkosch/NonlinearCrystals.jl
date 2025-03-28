@@ -5,15 +5,15 @@ using GLMakie
 import PhysicalConstants.CODATA2022: c_0
 
 # Define a simple SellmeierFunction for testing
-n_fun = (λ, T) -> 1.5 + 0.01 * (λ / 1u"µm")  # Arbitrary linear function
-dn_dtemp_fun = (λ, T) -> 1e-4u"K^-1"            # Constant derivative
-sri = SellmeierFunction(n_fun, (0.5u"µm", 2.0u"µm"); dn_dtemp_fun=dn_dtemp_fun, temp_range=(200u"K", 400u"K"))
+temp_ref = 293.15u"K"
+n_fun = (λ, T) -> 1.5 + 0.01 * (λ / 1u"µm") + 1e-4u"K^-1" * (T - temp_ref) # Arbitrary linear function
+sri = SellmeierFunction(n_fun, (0.5u"µm", 2.0u"µm"); temp_ref, temp_range=(200u"K", 400u"K"))
 
 # Test refractive_index basic
 λ_test = 1.0u"µm"
 T_test = 300u"K"
 n_val = refractive_index(sri, λ_test, T_test)
-@test isapprox(n_val, 1.51 + 1e-4 * (300 - 293.15); atol=1e-6)
+@test isapprox(n_val, 1.51 + 1e-4u"K^-1" * (T_test - temp_ref); atol=1e-6)
 
 # Test lambda range validity
 @test is_lambda_valid(1.0u"µm", sri) == true

@@ -1,3 +1,5 @@
+export plot_symmetry
+
 # From Frits Zernike, John E. Midwinter: Applied Nonlinear Optics
 const symmetry_groups_kleinman = Dict(
     # Pairs of related coefficients based on Kleinman's symmetry conditions and sign relations within each component group 

@@ -11,27 +11,22 @@ function create_cga()
     # From Tamošauskas, Gintaras; Beresnevičius, Gvidas; Gadonas, Darius; Dubietis, Audrius . (2018). Transmittance and phase matching of BBO crystal in the 3−5 μm range and its application for the characterization of mid-infrared laser pulses. Optical Materials Express, 8(6), 1410–. doi:10.1364/ome.8.001410 
     lambda_min = 2.4u"µm"
     lambda_max = 18.0u"µm"
+    temp_ref = 293u"K"
 
     n_o_principal = SellmeierFunction(
-        # [9.1064, 2.2998, 1.6247],
-        # [0.0, 1.0872, 1370] * 1u"µm^2",
-        (λ,T) -> sqrt(1 + 9.1064 + 2.2998u"µm^2" / (λ^2 - 1.0872u"µm^2") + 1.62478u"µm^2" / (λ^2 - 1370u"µm^2")),
+        (λ, T) -> sqrt(1 + 9.1064 + 2.2998u"µm^2" / (λ^2 - 1.0872u"µm^2") + 1.62478u"µm^2" / (λ^2 - 1370u"µm^2")),
         (lambda_min, lambda_max);
-        dn_dtemp_fun=(λ,T)->0.0u"K^-1",
-        temp_ref=293u"K",
+        temp_ref,
     )
 
     n_e_principal = SellmeierFunction(
-        # [10.8018, 1.2152, 1.6922],
-        # [0.0, 2.6971, 1370] * 1u"µm^2",
-        (λ,T) -> sqrt(1 + 10.8018 + 1.2152u"µm^2" / (λ^2 - 2.6971u"µm^2") + 1.6922u"µm^2" / (λ^2 - 1370u"µm^2")),
+        (λ, T) -> sqrt(1 + 10.8018 + 1.2152u"µm^2" / (λ^2 - 2.6971u"µm^2") + 1.6922u"µm^2" / (λ^2 - 1370u"µm^2")),
         (lambda_min, lambda_max);
-        dn_dtemp_fun=(λ,T)->0.0u"K^-1",
-        temp_ref=293u"K",
+        temp_ref,
     )
 
-    d = construct_d_tensor(metadata[:pointgroup]; d14=235.0u"pm/V") 
-        
+    d = construct_d_tensor(metadata[:pointgroup]; d14=235.0u"pm/V")
+
     CGA = UnidirectionalCrystal(
         metadata,
         n_o_principal,

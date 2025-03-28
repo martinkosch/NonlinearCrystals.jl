@@ -11,6 +11,7 @@ function create_lnb_c()
     # Handbook of Nonlinear Crystals
     lambda_min = 0.4u"µm"
     lambda_max = 5.5u"µm"
+    temp_ref = 293.15u"K"
 
     n_o_principal = SellmeierFunction(
         (λ, T) -> sqrt(
@@ -21,8 +22,7 @@ function create_lnb_c()
             0.027153u"µm^-2" * λ^2
         ),
         (lambda_min, lambda_max);
-        dn_dtemp_fun = (λ, T) -> 0.0u"K^-1",
-        temp_ref = 293.15u"K",
+        temp_ref,
     )
 
     n_e_principal = SellmeierFunction(
@@ -34,8 +34,7 @@ function create_lnb_c()
             0.021940u"µm^-2" * λ^2
         ),
         (lambda_min, lambda_max);
-        dn_dtemp_fun = (λ, T) -> 0.0u"K^-1",
-        temp_ref = 293.15u"K",
+        temp_ref,
     )
 
     d = construct_d_tensor(metadata[:pointgroup]; d22=2.10u"pm/V", d31=-4.35u"pm/V", d33=-27.2u"pm/V") # Measured at 1.06 µm

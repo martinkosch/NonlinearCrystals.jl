@@ -257,7 +257,7 @@ function plot_noncritical_pms(
         f[1, 1],
         xlabel="λ_b",
         ylabel="λ_r12",
-        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, Temperature: $(temp |> u"K") ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_r1_r2_b) # TODO: Add lambda names and o/e
+        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, Temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_r1_r2_b) # TODO: Add lambda names and o/e
         dim1_conversion=uc,
         dim2_conversion=uc,
     )
@@ -424,7 +424,7 @@ function plot_polar_mode(
     size::NTuple{2,Int}=(800, 600),
 )
     f = Figure(; size)
-    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(temp |> u"K") ($(float(temp |> u"°C")))"
+    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))"
     lambda_info = "$(round(u"nm", lambda_r1_r2_b[1]; digits)) (λ_r1, $(hi_or_lo_r1_r2_b[1])) + $(round(u"nm", lambda_r1_r2_b[2]; digits)) (λ_r2, $(hi_or_lo_r1_r2_b[2])) = $(round(u"nm", lambda_r1_r2_b[3]; digits)) (λ_b, $(hi_or_lo_r1_r2_b[3]))"
     ax = Axis(
         f[1, 1],
@@ -573,7 +573,7 @@ function plot_sphere_mode(
     size::NTuple{2,Int}=(800, 600),
 )
     f = Figure(; size)
-    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(temp |> u"K") ($(float(temp |> u"°C")))"
+    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))"
     lambda_info = "$(round(u"nm", lambda_r1_r2_b[1]; digits)) (λ_r1, $(hi_or_lo_r1_r2_b[1])) + $(round(u"nm", lambda_r1_r2_b[2]; digits)) (λ_r2, $(hi_or_lo_r1_r2_b[2])) = $(round(u"nm", lambda_r1_r2_b[3]; digits)) (λ_b, $(hi_or_lo_r1_r2_b[3]))"
     ax = Axis3(
         f[1, 1],

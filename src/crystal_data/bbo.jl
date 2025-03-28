@@ -29,19 +29,22 @@ function create_bbo()
     # Handbook of Nonlinear Crystals
     lambda_min = 0.189u"µm"
     lambda_max = 3.5u"µm"
+    temp_ref=293.15u"K"
 
     n_o_principal = SellmeierFunction(
-        (λ,T) -> sqrt(2.7359 + 0.01878u"µm^2" / (λ^2 - 0.01822u"µm^2") - 0.01354u"µm^-2" * λ^2),
+        (λ, T) -> begin
+            sqrt(2.7359 + 0.01878u"µm^2" / (λ^2 - 0.01822u"µm^2") - 0.01354u"µm^-2" * λ^2) - 16.6e-6u"K^-1" * (T - temp_ref)
+        end,
         (lambda_min, lambda_max);
-        dn_dtemp_fun=(λ,T) -> -16.6e-6u"K^-1",
-        temp_ref=293.15u"K",
+        temp_ref,
     )
 
     n_e_principal = SellmeierFunction(
-        (λ,T) -> sqrt(2.3753 + 0.01224u"µm^2" / (λ^2 - 0.01667u"µm^2") - 0.01516u"µm^-2" * λ^2),
+        (λ, T) -> begin
+            sqrt(2.3753 + 0.01224u"µm^2" / (λ^2 - 0.01667u"µm^2") - 0.01516u"µm^-2" * λ^2) - 9.3e-6u"K^-1" * (T - temp_ref)
+        end,
         (lambda_min, lambda_max);
-        dn_dtemp_fun=(λ,T) -> -9.3e-6u"K^-1",
-        temp_ref=293.15u"K",
+        temp_ref,
     )
 
     d = construct_d_tensor(metadata[:pointgroup]; d21=2.2u"pm/V", d31=0.08u"pm/V", d33=0.0u"pm/V") # TODO: Entry d33 is possibly not right!

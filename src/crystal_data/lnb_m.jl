@@ -20,7 +20,6 @@
 #             0.039636u"µm^-2" * λ^2
 #         ),
 #         (lambda_min, lambda_max);
-#         dn_dtemp_fun = (λ, T) -> 0.0u"K^-1", #TODO: Add temperature dependence
 #         temp_ref = 293.15u"K",
 #     )
 
@@ -31,7 +30,6 @@
 #             0.032068u"µm^-2" * λ^2
 #         ),
 #         (lambda_min, lambda_max);
-#         dn_dtemp_fun = (λ, T) -> 0.0u"K^-1", # TODO: Add temperature dependence
 #         temp_ref = 293.15u"K",
 #     )
     

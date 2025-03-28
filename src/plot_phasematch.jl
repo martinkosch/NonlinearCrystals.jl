@@ -248,9 +248,10 @@ function plot_noncritical_pms(
     temp::Temperature=default_temp(cr),
     ngrid=50,
     tol=1e-14u"nm^-1",
+    size::NTuple{2,Int}=(800, 600),
 )
 
-    f = Figure(size=(1000, 800))
+    f = Figure(; size)
     uc = Makie.UnitfulConversion(u"µm"; units_in_label=true)
     ax = Axis(
         f[1, 1],

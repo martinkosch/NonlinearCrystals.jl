@@ -100,10 +100,10 @@ function calc_unified_dir_signs(
     first_optical_axis_b::AbstractVector{<:Number}
 )
     # TODO: Check this and the signs of d_eff at opposite hemispheres
-    # Use the plane defined by k and the first optical axis of the blue beam to define the blue polarization direction sign; this is supposed to prevent sign jumps, e.g. in d_eff
-    dir_ref = cross(first_optical_axis_b, k)
-    sign_b = sign(dot(dir_vecs_r1_r2_b[3], dir_ref))
-
+    # Use the first optical axis of the blue beam to define the blue polarization direction sign; this is supposed to prevent sign jumps, e.g. in d_eff
+    sign_b = sign(dot(dir_vecs_r1_r2_b[3], first_optical_axis_b))
+    
+    dir_ref = cross(dir_vecs_r1_r2_b[3], k)
     d_r1_ref = dot(dir_ref, dir_vecs_r1_r2_b[1])
     d_r1_b = dot(dir_vecs_r1_r2_b[3], dir_vecs_r1_r2_b[1])
     d_r2_ref = dot(dir_ref, dir_vecs_r1_r2_b[2])

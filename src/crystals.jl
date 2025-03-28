@@ -74,7 +74,7 @@ function calc_d_eff(
     E_dir_r2::AbstractVector{<:Number}, 
     E_dir_b::AbstractVector{<:Number}
 )
-    P_dir_b = [
+        P_dir_b = [
         E_dir_r1[1] * E_dir_r2[1],                             # xx
         E_dir_r1[2] * E_dir_r2[2],                             # yy
         E_dir_r1[3] * E_dir_r2[3],                             # zz

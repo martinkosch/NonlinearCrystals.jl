@@ -478,8 +478,7 @@ function find_all_pms_along_dimension(
     end
     
     red_fixed_count = count(.!isnothing.([lambda_r1_fixed, lambda_r2_fixed]))
-    @assert red_fixed_count < 2 "Only either lambda_r1_fixed or lambda_r2_fixed should be provided but both are given."
-    @assert (count(.!isnothing.([temp_fixed, lambda_b_fixed])) + red_fixed_count) == 2 "You must provide exactly two of those: (temp_min == temp_max), lambda_b_fixed, and (lambda_r1_fixed or lambda_r2_fixed)."
+    @assert (count(.!isnothing.([temp_fixed, lambda_b_fixed])) + red_fixed_count) == 2 "You must provide exactly two of those: (temp_min == temp_max), lambda_b_fixed, lambda_r1_fixed, and lambda_r2_fixed."
 
     hi_or_lo_r1_r2_b = pol_r1_r2_b # TODO: Enable searching along temperature and wavelengths with :o/:e notation
 

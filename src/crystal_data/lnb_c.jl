@@ -37,12 +37,13 @@ function create_lnb_c()
         temp_ref,
     )
 
-    d = construct_d_tensor(metadata[:pointgroup]; d22=2.10u"pm/V", d31=-4.35u"pm/V", d33=-27.2u"pm/V") # Measured at 1.06 µm
+    d_XYZ_full = calc_d_XYZ_full(metadata[:pointgroup]; d22=2.10u"pm/V", d31=-4.35u"pm/V", d33=-27.2u"pm/V") # Measured at 1.06 µm
+    
     LNB_C = UnidirectionalCrystal(
         metadata,
         n_o_principal,
         n_e_principal,
-        d,
+        d_XYZ_full,
     )
     return LNB_C
 end

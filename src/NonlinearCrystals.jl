@@ -2,6 +2,7 @@ module NonlinearCrystals
 
 using StaticArrays
 using LinearAlgebra 
+using Tullio 
 using Unitful 
 using Roots 
 using GLMakie 

@@ -7,28 +7,36 @@ abstract type RefractiveIndex end
 
 Base.broadcastable(ri::RefractiveIndex) = Ref(ri)
 
-(ri::RefractiveIndex)(lambda::Length, temp::Temperature=ri.temp_ref) = refractive_index(ri, lambda, temp) # Shorthand for refractive_index
+(ri::RefractiveIndex)(lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri)) = refractive_index(ri, lambda, temp) # Shorthand for refractive_index
+
+function default_lambda(ri::RefractiveIndex)
+    return isnothing(ri.lambda_range) ? 633u"nm" : sum(ri.lambda_range) / 2
+end
+
+function default_temp(ri::RefractiveIndex)
+    ri.temp_ref
+end
 
 # Compute first, second, and third derivatives using ForwardDiff.jl
-function dn_dλ(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function dn_dλ(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     return ForwardDiff.derivative(lambda -> refractive_index(ri, lambda * 1u"m", temp), ustrip(lambda |> u"m")) * 1u"m^-1"
 end
 
-function d2n_dλ2(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function d2n_dλ2(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     return ForwardDiff.derivative(lambda -> ustrip(dn_dλ(ri, lambda * 1u"m", temp)), ustrip(lambda |> u"m")) * 1u"m^-2"
 end
 
-function d3n_dλ3(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function d3n_dλ3(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     return ForwardDiff.derivative(lambda -> ustrip(d2n_dλ2(ri, lambda * 1u"m", temp)), ustrip(lambda |> u"m")) * 1u"m^-3"
 end
 
 # β0 = k
-function β0(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function β0(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     return (2π / lambda * refractive_index(ri, lambda, temp)) |> u"m^-1"
 end
 
 # β1 = ∂k/∂ω
-function β1(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function β1(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     ω_in = 2π * c_0 / lambda
     return (
         ForwardDiff.derivative(
@@ -38,7 +46,7 @@ function β1(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
 end
 
 # β2 = ∂²k/∂ω²
-function β2(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function β2(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     ω_in = 2π * c_0 / lambda
     return (
         ForwardDiff.derivative(
@@ -48,7 +56,7 @@ function β2(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
 end
 
 # β3 = ∂³k/∂ω³
-function β3(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function β3(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     ω_in = 2π * c_0 / lambda
     return (
         ForwardDiff.derivative(
@@ -58,19 +66,19 @@ function β3(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
 end
 
 
-function group_index(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function group_index(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     return β1(ri, lambda, temp) * c_0
 end
 
-function phase_velocity(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function phase_velocity(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     return c_0 / refractive_index(ri, lambda, temp) |> u"m/s"
 end
 
-function group_velocity(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function group_velocity(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     return 1 / β1(ri, lambda, temp) |> u"m/s"
 end
 
-function dn_dtemp(ri::RefractiveIndex, lambda::Length, temp::Temperature=ri.temp_ref)
+function dn_dtemp(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::Temperature=default_temp(ri))
     return ForwardDiff.derivative(
         t -> ustrip(refractive_index(ri, lambda, t * 1u"K")),
         ustrip(u"K", temp)

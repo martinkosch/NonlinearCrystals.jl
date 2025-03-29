@@ -25,13 +25,13 @@ function create_cga()
         temp_ref,
     )
 
-    d = construct_d_tensor(metadata[:pointgroup]; d14=235.0u"pm/V")
+    d_XYZ_full = calc_d_XYZ_full(metadata[:pointgroup]; d14=235.0u"pm/V")
 
     CGA = UnidirectionalCrystal(
         metadata,
         n_o_principal,
         n_e_principal,
-        d,
+        d_XYZ_full,
     )
     return CGA
 end

@@ -309,7 +309,7 @@ function plot_delta_k_map(
     lambda_r1_r2_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
 
     if isnothing(temp)
-        temp = isa(cr, UnidirectionalCrystal) ? cr.n_o_principal.temp_ref : cr.n_x_principal.temp_ref
+        temp = isa(cr, UnidirectionalCrystal) ? cr.n_o_principal.temp_ref : cr.n_X_principal.temp_ref
     end
 
     θ_range, ϕ_range, all_delta_k = compute_delta_k_grid(cr, hi_or_lo_r1_r2_b, lambda_r1_r2_b..., temp, n_points)

@@ -2,35 +2,37 @@ using NonlinearCrystals
 using Test
 using Unitful
 
-@test KTP_F.n_x_principal(default_lambda(KTP_F), default_temp(KTP_F)) > 1
-@test KTP_F.n_y_principal(default_lambda(KTP_F), default_temp(KTP_F)) > 1
-@test KTP_F.n_z_principal(default_lambda(KTP_F), default_temp(KTP_F)) > 1
+@test typeof(NonlinearCrystals.create_ktp_f()) <: BidirectionalCrystal
+
+@test KTP_F.n_X_principal(default_lambda(KTP_F), default_temp(KTP_F)) > 1
+@test KTP_F.n_Y_principal(default_lambda(KTP_F), default_temp(KTP_F)) > 1
+@test KTP_F.n_Z_principal(default_lambda(KTP_F), default_temp(KTP_F)) > 1
 
 # Sample refractive indices (from: Handbook of Nonlinear Crystals)
-@test isapprox(KTP_F.n_x_principal(0.4047u"µm", 293u"K"), 1.8249, atol=0.01)
-@test isapprox(KTP_F.n_x_principal(0.5893u"µm", 293u"K"), 1.7689, atol=0.01)
-@test isapprox(KTP_F.n_x_principal(1.3414u"µm", 293u"K"), 1.7314, atol=0.01)
+@test isapprox(KTP_F.n_X_principal(0.4047u"µm", 293u"K"), 1.8249, atol=0.01)
+@test isapprox(KTP_F.n_X_principal(0.5893u"µm", 293u"K"), 1.7689, atol=0.01)
+@test isapprox(KTP_F.n_X_principal(1.3414u"µm", 293u"K"), 1.7314, atol=0.01)
 
-@test isapprox(KTP_F.n_y_principal(0.4047u"µm", 293u"K"), 1.8410, atol=0.01)
-@test isapprox(KTP_F.n_y_principal(0.5893u"µm", 293u"K"), 1.7780, atol=0.01)
-@test isapprox(KTP_F.n_y_principal(1.3414u"µm", 293u"K"), 1.7387, atol=0.01)
+@test isapprox(KTP_F.n_Y_principal(0.4047u"µm", 293u"K"), 1.8410, atol=0.01)
+@test isapprox(KTP_F.n_Y_principal(0.5893u"µm", 293u"K"), 1.7780, atol=0.01)
+@test isapprox(KTP_F.n_Y_principal(1.3414u"µm", 293u"K"), 1.7387, atol=0.01)
 
-@test isapprox(KTP_F.n_z_principal(0.4047u"µm", 293u"K"), 1.9629, atol=0.01)
-@test isapprox(KTP_F.n_z_principal(0.5893u"µm", 293u"K"), 1.8740, atol=0.01)
-@test isapprox(KTP_F.n_z_principal(1.3414u"µm", 293u"K"), 1.8211, atol=0.01)
+@test isapprox(KTP_F.n_Z_principal(0.4047u"µm", 293u"K"), 1.9629, atol=0.01)
+@test isapprox(KTP_F.n_Z_principal(0.5893u"µm", 293u"K"), 1.8740, atol=0.01)
+@test isapprox(KTP_F.n_Z_principal(1.3414u"µm", 293u"K"), 1.8211, atol=0.01)
 
 # Test optical axis
 @test isapprox(optical_axis_angle(KTP_F, 0.5461u"µm"), 37.4u"°" / 2, atol=ustrip(u"rad", 1u"°"))
 
 # Test temperature derivatives
-@test isapprox(dn_dtemp(KTP_F.n_x_principal, 0.5321u"µm", 293u"K"), 2.41e-5u"K^-1", atol=0.1e-5u"K^-1")
-@test isapprox(dn_dtemp(KTP_F.n_x_principal, 1.0642u"µm", 293u"K"), 1.65e-5u"K^-1", atol=0.1e-5u"K^-1")
+@test isapprox(dn_dtemp(KTP_F.n_X_principal, 0.5321u"µm", 293u"K"), 2.41e-5u"K^-1", atol=0.1e-5u"K^-1")
+@test isapprox(dn_dtemp(KTP_F.n_X_principal, 1.0642u"µm", 293u"K"), 1.65e-5u"K^-1", atol=0.1e-5u"K^-1")
 
-@test isapprox(dn_dtemp(KTP_F.n_y_principal, 0.5321u"µm", 293u"K"), 3.21e-5u"K^-1", atol=0.1e-5u"K^-1")
-@test isapprox(dn_dtemp(KTP_F.n_y_principal, 1.0642u"µm", 293u"K"), 2.50e-5u"K^-1", atol=0.1e-5u"K^-1")
+@test isapprox(dn_dtemp(KTP_F.n_Y_principal, 0.5321u"µm", 293u"K"), 3.21e-5u"K^-1", atol=0.1e-5u"K^-1")
+@test isapprox(dn_dtemp(KTP_F.n_Y_principal, 1.0642u"µm", 293u"K"), 2.50e-5u"K^-1", atol=0.1e-5u"K^-1")
 
-@test isapprox(dn_dtemp(KTP_F.n_z_principal, 0.5321u"µm", 293u"K"), 4.27e-5u"K^-1", atol=0.1e-5u"K^-1")
-@test isapprox(dn_dtemp(KTP_F.n_z_principal, 1.0642u"µm", 293u"K"), 3.40e-5u"K^-1", atol=0.1e-5u"K^-1")
+@test isapprox(dn_dtemp(KTP_F.n_Z_principal, 0.5321u"µm", 293u"K"), 4.27e-5u"K^-1", atol=0.1e-5u"K^-1")
+@test isapprox(dn_dtemp(KTP_F.n_Z_principal, 1.0642u"µm", 293u"K"), 3.40e-5u"K^-1", atol=0.1e-5u"K^-1")
 
 # Test sampled phasematches (from: Handbook of Nonlinear Crystals)
 pm1 = find_nearest_pm_along_theta_phi(90u"°", 24.59u"°", [:lo, :hi, :lo], KTP_H; lambda_r1=1.0642u"µm", lambda_b=0.5321u"µm", temp=293u"K") 

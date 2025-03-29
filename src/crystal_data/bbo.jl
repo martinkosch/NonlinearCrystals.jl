@@ -6,6 +6,7 @@ function create_bbo()
         :lattice_params => (12.532u"Å", 12.532u"Å", 12.717u"Å"),
         :density => 3.85u"g/cm^3",
         :mohs_hardness => 4,
+        :axes_assignment_XYZ => (:a, :b, :c),
     )
 
     # From Tamošauskas, Gintaras; Beresnevičius, Gvidas; Gadonas, Darius; Dubietis, Audrius . (2018). Transmittance and phase matching of BBO crystal in the 3−5 μm range and its application for the characterization of mid-infrared laser pulses. Optical Materials Express, 8(6), 1410–. doi:10.1364/ome.8.001410 
@@ -47,13 +48,14 @@ function create_bbo()
         temp_ref,
     )
 
-    d = construct_d_tensor(metadata[:pointgroup]; d21=2.2u"pm/V", d31=0.08u"pm/V", d33=0.0u"pm/V") # TODO: Entry d33 is possibly not right!
+    # d_XYZ_full = calc_d_XYZ_full(metadata[:pointgroup], metadata[:axes_assignment_XYZ]; d22=2.2u"pm/V", d15=0.08u"pm/V", d33=0.0u"pm/V") # TODO: Entry d33 is possibly not right!
+    d_XYZ_full = calc_d_XYZ_full(metadata[:pointgroup], metadata[:axes_assignment_XYZ]; d21=2.2u"pm/V", d31=0.08u"pm/V", d33=0.0u"pm/V") # TODO: Entry d33 is possibly not right!
 
     BBO = UnidirectionalCrystal(
         metadata,
         n_o_principal,
         n_e_principal,
-        d,
+        d_XYZ_full,
     )
     return BBO
 end

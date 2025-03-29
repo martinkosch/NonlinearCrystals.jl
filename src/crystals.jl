@@ -3,19 +3,19 @@ export NonlinearCrystal, UnidirectionalCrystal, BidirectionalCrystal, default_la
 abstract type NonlinearCrystal end
 
 function default_lambda(cr::NonlinearCrystal)
-    return isnothing(cr.n_x_principal.lambda_range) ? 633u"nm" : sum(cr.n_x_principal.lambda_range) / 2
+    return isnothing(cr.n_X_principal.lambda_range) ? 633u"nm" : sum(cr.n_X_principal.lambda_range) / 2
 end
 
 function default_temp(cr::NonlinearCrystal)
-    cr.n_x_principal.temp_ref
+    cr.n_X_principal.temp_ref
 end
 
 function is_lambda_valid(lambda::Length, cr::NonlinearCrystal; warn_tol::Length=1u"nm")
-    return is_lambda_valid(lambda, cr.n_x_principal; warn_tol) && is_lambda_valid(lambda, cr.n_y_principal; warn_tol) && is_lambda_valid(lambda, cr.n_z_principal; warn_tol)
+    return is_lambda_valid(lambda, cr.n_X_principal; warn_tol) && is_lambda_valid(lambda, cr.n_Y_principal; warn_tol) && is_lambda_valid(lambda, cr.n_Z_principal; warn_tol)
 end
 
 function valid_lambda_range(cr::NonlinearCrystal)
-    lambda_ranges = [cr.n_x_principal.lambda_range, cr.n_y_principal.lambda_range, cr.n_z_principal.lambda_range]
+    lambda_ranges = [cr.n_X_principal.lambda_range, cr.n_Y_principal.lambda_range, cr.n_Z_principal.lambda_range]
     min_valid_lambda = maximum([l[1] for l in lambda_ranges])
     max_valid_lambda = minimum([l[2] for l in lambda_ranges])
     return (min_valid_lambda, max_valid_lambda)
@@ -29,16 +29,83 @@ function tensor_indices(comp::Symbol)
     (i, j)
 end
 
-function construct_d_tensor(pointgroup::String, use_kleinman::Bool=true; components...)
-    comps = [c[1] for c in components]
-    vals = [c[2] for c in components]
+# Expand 3x6 contracted tensor into full 3x3x3
+function expand_d_contract(d_contract::AbstractMatrix{<:Number})
+    d_full = zeros(eltype(d_contract), 3, 3, 3)
+    idx_map = [
+        (1, 1), (2, 2), (3, 3),  # J=1,2,3
+        (2, 3), (1, 3), (1, 2)   # J=4,5,6 (symmetric indices)
+    ]
+    for i in 1:3, J in 1:6
+        j, k = idx_map[J]
+        d_full[i, j, k] += d_contract[i, J]
+        if j != k
+            d_full[i, k, j] += d_contract[i, J]  # symmetry
+        end
+    end
+    return d_full
+end
+
+# Rotate 3x3x3 tensor
+function rotate_tensor3(d::AbstractArray{<:Number,3}, R::AbstractMatrix{<:Number})
+    @tullio d_rot[i_dash, j_dash, k_dash] := R[i_dash, i] * R[j_dash, j] * R[k_dash, k] * d[i, j, k]
+end
+
+# Contract back to 3x6
+function contract_d_tensor(d_full::AbstractArray{<:Number,3})
+    d_contract = zeros(eltype(d_full), 3, 6)
+    idx_map = [
+        (1, 1), (2, 2), (3, 3),
+        (2, 3), (1, 3), (1, 2)
+    ]
+    for i in 1:3, J in 1:6
+        j, k = idx_map[J]
+        if j == k
+            d_contract[i, J] = d_full[i, j, k]
+        else
+            d_contract[i, J] = 0.5 * (d_full[i, j, k] + d_full[i, k, j])
+        end
+    end
+    return d_contract
+end
+
+function calc_rot_mat_from_assignment(axes_assignment_XYZ::NTuple{3,Symbol})
+    # Standard basis in XYZ
+    basis_vectors = Dict(
+        :X => [1.0, 0.0, 0.0],
+        :Y => [0.0, 1.0, 0.0],
+        :Z => [0.0, 0.0, 1.0]
+    )
+
+    # Create a::Vector, b::Vector, c::Vector based on XYZ assignment
+    # We want to know how a, b, c are expressed in XYZ
+    axis_order = [:a, :b, :c]
+    rot_mat = zeros(3, 3)
+    for (i, axis_sym) in enumerate(axis_order)
+        # Find which XYZ direction this axis is assigned to
+        idx_in_XYZ = findfirst(x -> x == axis_sym, axes_assignment_XYZ)
+        rot_mat[i, :] .= basis_vectors[[:X, :Y, :Z][idx_in_XYZ]]
+    end
+
+    return rot_mat
+end
+
+function calc_d_XYZ_full(
+    pointgroup::String,
+    axes_assignment_XYZ::Union{NTuple{3,Symbol},AbstractMatrix{<:Number}}=(:a, :b, :c),
+    use_kleinman::Bool=true;
+    components_abc...
+)
+    comps = [c[1] for c in components_abc]
+    vals = [c[2] for c in components_abc]
     sg = use_kleinman ? symmetry_groups_kleinman : symmetry_groups
 
     symmetry = get(sg, pointgroup, nothing)
     symmetry !== nothing || error("Point group '$pointgroup' not defined.")
 
     # Iterate through each symmetry group to ensure consistency
-    d_res = zeros(3, 6) * u"pm/V"
+    # Symmetry goups and given components are assumed to be specified in abc coordinates
+    d_abc = zeros(3, 6) * u"pm/V"
     for group in symmetry
         group_comps, group_signs = group
         given_group_comps = intersect(Set(group_comps), Set(comps))
@@ -61,57 +128,101 @@ function construct_d_tensor(pointgroup::String, use_kleinman::Bool=true; compone
         # Set all group components based on the given component with the correct sign relations
         c_idx = findall(c -> (c === given_group_comp), comps)[1]
         for (gc, gs) in zip(group_comps, group_signs_switched)
-            d_res[tensor_indices(gc)...] = vals[c_idx] * gs
+            d_abc[tensor_indices(gc)...] = vals[c_idx] * gs
         end
     end
 
-    return d_res
+    # Rotate d tensor from abc coordinates to XYZ coordinates based on the provided assigment
+    rot_mat = isa(axes_assignment_XYZ, AbstractMatrix) ? axes_assignment_XYZ : calc_rot_mat_from_assignment(axes_assignment_XYZ)
+    d_abc_full = expand_d_contract(d_abc)
+    d_XYZ_full = rotate_tensor3(d_abc_full, rot_mat)
+    return d_XYZ_full
 end
 
 function calc_d_eff(
-    cr::NonlinearCrystal, 
-    E_dir_r1::AbstractVector{<:Number}, 
-    E_dir_r2::AbstractVector{<:Number}, 
-    E_dir_b::AbstractVector{<:Number}
-)
-        P_dir_b = [
-        E_dir_r1[1] * E_dir_r2[1],                             # xx
-        E_dir_r1[2] * E_dir_r2[2],                             # yy
-        E_dir_r1[3] * E_dir_r2[3],                             # zz
-        E_dir_r1[2] * E_dir_r2[3] + E_dir_r1[3] * E_dir_r2[2], # yz + zy
-        E_dir_r1[1] * E_dir_r2[3] + E_dir_r1[3] * E_dir_r2[1], # xz + zx
-        E_dir_r1[1] * E_dir_r2[2] + E_dir_r1[2] * E_dir_r2[1]  # xy + yx
-    ]
+    cr::NonlinearCrystal,
+    E_dir_r1::AbstractVector{<:Number},
+    E_dir_r2::AbstractVector{<:Number},
+    E_dir_b::AbstractVector{<:Number};
+    lambda_r1_r2_b::Union{AbstractVector{<:Length},Nothing}=nothing,
+    temp::Temperature=default_temp(cr),
+)   
+    # If all lambdas are given, use Miller scaling
+    # if isnothing(lambda_r1_r2_b)
+        @tullio d_eff := E_dir_b[i] * cr.d_XYZ_ref_full[i, j, k] * E_dir_r1[j] * E_dir_r2[k]
+    # else
+    #     # Compute refractive indices along XYZ at given wavelengths and temperature
+    #     n_r1 = @SVector [
+    #         cr.n_X_principal(lambda_r1_r2_b[1], temp),
+    #         cr.n_Y_principal(lambda_r1_r2_b[1], temp),
+    #         cr.n_Z_principal(lambda_r1_r2_b[1], temp)
+    #     ]
+    #     n_r2 = @SVector [
+    #         cr.n_X_principal(lambda_r1_r2_b[2], temp),
+    #         cr.n_Y_principal(lambda_r1_r2_b[2], temp),
+    #         cr.n_Z_principal(lambda_r1_r2_b[2], temp)
+    #     ]
+    #     n_b = @SVector [
+    #         cr.n_X_principal(lambda_r1_r2_b[3], temp),
+    #         cr.n_Y_principal(lambda_r1_r2_b[3], temp),
+    #         cr.n_Z_principal(lambda_r1_r2_b[3], temp)
+    #     ]
 
-    return dot(E_dir_b, cr.d * P_dir_b)
+    #     # Use Miller-scaled d_XYZ tensor to calculate d_eff
+    #     @tullio d_eff := E_dir_b[i] * cr.miller_delta[i, j, k] * n_r1[i] * n_r2[j] * n_b[k] * E_dir_r1[j] * E_dir_r2[k]
+    # end
+    return d_eff
 end
 
+# function compute_miller_delta(
+#     d_ref_XYZ::AbstractMatrix{<:Number},
+#     lambda_r1::Length,
+#     lambda_r2::Length,
+#     lambda_b::Length,
+#     temp::Temperature,
+#     n_X_principal::RefractiveIndex,
+#     n_Y_principal::RefractiveIndex,
+#     n_Z_principal::RefractiveIndex,
+# )
+#     @assert size(d_ref_XYZ) == (3, 6)
+#     d_ref_XYZ_expanded = expand_d_contract(d_ref_XYZ)
+
+#     n_r1 = @SVector [n_X_principal(lambda_r1, temp), n_Y_principal(lambda_r1, temp), n_Z_principal(lambda_r1, temp)]
+#     n_r2 = @SVector [n_X_principal(lambda_r2, temp), n_Y_principal(lambda_r2, temp), n_Z_principal(lambda_r2, temp)]
+#     n_b = @SVector [n_X_principal(lambda_b, temp), n_Y_principal(lambda_b, temp), n_Z_principal(lambda_b, temp)]
+
+#     @tullio miller_delta[i, j, k] := d_ref_XYZ_expanded[i, j, k] / (n_r1[i] * n_r2[j] * n_b[k])
+
+#     return miller_delta
+# end
 
 ## Unidirectional crystal
 
 struct UnidirectionalCrystal{TM,TE,TO,TD} <: NonlinearCrystal
     metadata::TM
-    n_xy_principal::TE
-    n_z_principal::TO
-    d::SMatrix{3,6,TD}
+    n_XY_principal::TE
+    n_Z_principal::TO
+    d_XYZ_ref_full::SArray{Tuple{3,3,3},TD}
 
     function UnidirectionalCrystal(
         metadata::Dict,
         n_o_principal::RefractiveIndex,
         n_e_principal::RefractiveIndex,
-        d::AbstractMatrix,
+        d_XYZ_ref_full::AbstractArray{<:Number,3};
     )
-        return new{typeof(metadata),typeof(n_o_principal),typeof(n_e_principal),eltype(d)}(
-            metadata, n_o_principal, n_e_principal, SMatrix{3,6,eltype(d)}(d)
+        return new{typeof(metadata),typeof(n_o_principal),typeof(n_e_principal),eltype(d_XYZ_ref_full)}(
+            metadata, n_o_principal, n_e_principal, SArray{Tuple{3,3,3},eltype(d_XYZ_ref_full)}(d_XYZ_ref_full)
         )
     end
 end
 
 function Base.getproperty(cr::UnidirectionalCrystal, sym::Symbol)
-    if sym === :n_x_principal || sym === :n_y_principal || sym === :n_o_principal
-        return cr.n_xy_principal
+    if sym === :n_X_principal || sym === :n_Y_principal || sym === :n_o_principal
+        return cr.n_XY_principal
     elseif sym === :n_e_principal
-        return cr.n_z_principal
+        return cr.n_Z_principal
+    elseif sym === :d_XYZ_ref
+        return contract_d_tensor(cr.d_XYZ_ref_full)
     else # Fallback to real fields
         return getfield(cr, sym)
     end
@@ -121,21 +232,32 @@ end
 
 struct BidirectionalCrystal{TM,TX,TY,TZ,TD} <: NonlinearCrystal
     metadata::TM
-    n_x_principal::TX
-    n_y_principal::TY
-    n_z_principal::TZ
-    d::SMatrix{3,6,TD}
+    n_X_principal::TX
+    n_Y_principal::TY
+    n_Z_principal::TZ
+    d_XYZ_ref_full::SArray{Tuple{3,3,3},TD}
 
     function BidirectionalCrystal(
         metadata::Dict,
-        n_x_principal::RefractiveIndex,
-        n_y_principal::RefractiveIndex,
-        n_z_principal::RefractiveIndex,
-        d::AbstractMatrix,
+        n_X_principal::RefractiveIndex,
+        n_Y_principal::RefractiveIndex,
+        n_Z_principal::RefractiveIndex,
+        d_XYZ_ref_full::AbstractArray{<:Number,3};
+        warn_n_Z_smaller_n_X::Bool=true,
     )
-        return new{typeof(metadata),typeof(n_x_principal),typeof(n_y_principal),typeof(n_z_principal),eltype(d)}(
-            metadata, n_x_principal, n_y_principal, n_z_principal, SMatrix{3,6,eltype(d)}(d)
+        warnstring = "n_Z_principal >= n_Y_principal >= n_X_principal should be used in this package for biaxial crystals$(haskey(metadata, :description) ? " but this is not fulfilled for crystal '$(metadata[:description])'." : ".")"
+        warn_n_Z_smaller_n_X && (n_Z_principal() < n_Y_principal() < n_X_principal()) && (@warn warnstring)
+        return new{typeof(metadata),typeof(n_X_principal),typeof(n_Y_principal),typeof(n_Z_principal),eltype(d_XYZ_ref_full)}(
+            metadata, n_X_principal, n_Y_principal, n_Z_principal, SArray{Tuple{3,3,3},eltype(d_XYZ_ref_full)}(d_XYZ_ref_full)
         )
+    end
+end
+
+function Base.getproperty(cr::BidirectionalCrystal, sym::Symbol)
+    if sym === :d_XYZ_ref
+        return contract_d_tensor(cr.d_XYZ_ref_full)
+    else # Fallback to real fields
+        return getfield(cr, sym)
     end
 end
 
@@ -147,14 +269,14 @@ function o_e_to_hi_lo(
 )
     n_o_principal = refractive_index(cr.n_o_principal, lambda, temp)
     n_e_principal = refractive_index(cr.n_e_principal, lambda, temp)
-    
+
     o_or_e === :o && return n_o_principal > n_e_principal ? (:hi) : (:lo)
     o_or_e === :e && return n_e_principal > n_o_principal ? (:hi) : (:lo)
     error("Polarization must be :o or :e. Currently it is $(o_or_e).")
 end
 
 function o_e_to_hi_lo(
-    o_or_e_r1_r2_b::AbstractVector{Symbol}, 
+    o_or_e_r1_r2_b::AbstractVector{Symbol},
     cr::UnidirectionalCrystal,
     lambda_r1_r2_b::AbstractVector{<:Unitful.Length};
     temp::Temperature=default_temp(cr),
@@ -177,7 +299,7 @@ function hi_lo_to_o_e(
 end
 
 function hi_lo_to_o_e(
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol}, 
+    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
     cr::UnidirectionalCrystal,
     lambda_r1_r2_b::AbstractVector{<:Unitful.Length};
     temp::Temperature=default_temp(cr),
@@ -186,20 +308,20 @@ function hi_lo_to_o_e(
 end
 
 function polarization_r1_r2_b_to_hi_lo(
-    pol_r1_r2_b::AbstractVector{Symbol}, 
+    pol_r1_r2_b::AbstractVector{Symbol},
     cr::NonlinearCrystal,
     lambda_r1_r2_b::AbstractVector{<:Unitful.Length};
     temp::Temperature=default_temp(cr),
 )
     if all([p in [:hi, :lo] for p in pol_r1_r2_b])
         return pol_r1_r2_b
-    elseif isa(cr, UnidirectionalCrystal) 
+    elseif isa(cr, UnidirectionalCrystal)
         if all([p in [:o, :e] for p in pol_r1_r2_b])
             return o_e_to_hi_lo(pol_r1_r2_b, cr, lambda_r1_r2_b; temp)
         else
             @error "$(pol_r1_r2_b) is unvalid polarization data."
         end
-    else 
+    else
         @error "$(pol_r1_r2_b) is unvalid polarization data for a crystal of type $(typeof(cr))."
     end
 end
@@ -210,18 +332,18 @@ function optical_axis_angle(
     temp::Temperature=default_temp(cr);
 )
     if isnothing(lambda)
-        lambda = isnothing(cr.n_x_principal.lambda_range) ? 633u"nm" : sum(cr.n_x_principal.lambda_range) / 2
+        lambda = isnothing(cr.n_X_principal.lambda_range) ? 633u"nm" : sum(cr.n_X_principal.lambda_range) / 2
     end
 
-    nx = refractive_index(cr.n_x_principal, lambda, temp)
-    ny = refractive_index(cr.n_y_principal, lambda, temp)
-    nz = refractive_index(cr.n_z_principal, lambda, temp)
+    n_X = refractive_index(cr.n_X_principal, lambda, temp)
+    n_Y = refractive_index(cr.n_Y_principal, lambda, temp)
+    n_Z = refractive_index(cr.n_Z_principal, lambda, temp)
 
     # TODO: Clean up using matrix notation
-    if nx < nz
-        Vz = asin((nz * sqrt(ny^2 - nx^2)) / (ny * sqrt(nz^2 - nx^2)))
+    if n_X < n_Z
+        Vz = asin((n_Z * sqrt(n_Y^2 - n_X^2)) / (n_Y * sqrt(n_Z^2 - n_X^2)))
     else
-        Vz = acos((nx * sqrt(ny^2 - nz^2)) / (ny * sqrt(nx^2 - nz^2)))
+        Vz = acos((n_X * sqrt(n_Y^2 - n_Z^2)) / (n_Y * sqrt(n_X^2 - n_Z^2)))
     end
 
     return Vz |> u"rad"
@@ -243,7 +365,7 @@ function refraction_data_hi_lo(
     temp::Temperature=default_temp(cr);
     n_hi_lo_only::Bool=false,
 )
-    k_dir, ε_tensor, n_xyz = calc_k_dir_ε_tensor_n_xyz(θ, ϕ, cr, lambda, temp)
+    k_dir, ε_tensor, n_XYZ = calc_k_dir_ε_tensor_n_XYZ(θ, ϕ, cr, lambda, temp)
     n_hi_lo, D_dir_hi_lo = calc_n_hi_lo_D_dir_hi_lo(k_dir, ε_tensor)
     n_hi_lo_only && return n_hi_lo
 
@@ -261,21 +383,21 @@ function refraction_data_hi_lo(
     return n_hi_lo, D_dir_hi_lo, E_dir_hi_lo, S_dir_hi_lo, walkoff_angle_hi_lo, group_index_hi_lo, β0_hi_lo, β1_hi_lo, β2_hi_lo, β3_hi_lo
 end
 
-function calc_k_dir_ε_tensor_n_xyz(
+function calc_k_dir_ε_tensor_n_XYZ(
     θ::Angle,
     ϕ::Angle,
     cr::NonlinearCrystal,
     lambda::Length=default_lambda(cr),
     temp::Temperature=default_temp(cr),
 )
-    nx = refractive_index(cr.n_x_principal, lambda, temp)
-    ny = refractive_index(cr.n_y_principal, lambda, temp)
-    nz = refractive_index(cr.n_z_principal, lambda, temp)
+    n_X = refractive_index(cr.n_X_principal, lambda, temp)
+    n_Y = refractive_index(cr.n_Y_principal, lambda, temp)
+    n_Z = refractive_index(cr.n_Z_principal, lambda, temp)
 
     k_dir = angles_to_vector(θ, ϕ)
-    ε_tensor = Diagonal(@SVector [1 / nx^2, 1 / ny^2, 1 / nz^2])
+    ε_tensor = Diagonal(@SVector [1 / n_X^2, 1 / n_Y^2, 1 / n_Z^2])
 
-    return k_dir, ε_tensor, (nx, ny, nz)
+    return k_dir, ε_tensor, (n_X, n_Y, n_Z)
 end
 
 function calc_n_hi_lo_D_dir_hi_lo(k_dir::AbstractVector{<:Real}, ε_tensor::AbstractMatrix{<:Real})
@@ -373,13 +495,13 @@ function plot_birefringent_refraction(
     lambda::Length=default_lambda(cr),
     temp::Temperature=default_temp(cr);
 )
-    k_dir, ε_tensor, (nx, ny, nz) = calc_k_dir_ε_tensor_n_xyz(θ, ϕ, cr, lambda, temp)
+    k_dir, ε_tensor, (n_X, n_Y, n_Z) = calc_k_dir_ε_tensor_n_XYZ(θ, ϕ, cr, lambda, temp)
     n_hi_lo, D_dir_hi_lo, E_dir_hi_lo, S_dir_hi_lo, walkoff_angle_hi_lo = refraction_data_hi_lo(θ, ϕ, cr, lambda, temp)
 
     f = Figure()
     ax = Axis3(f[1, 1], azimuth=0.1π, elevation=0.05π, aspect=:data, viewmode=:fit)
 
-    draw_ellipsoid!(ax, [0, 0, 0], [1 / nx^2, 1 / ny^2, 1 / nz^2]; alpha=0.2)
+    draw_ellipsoid!(ax, [0, 0, 0], [1 / n_X^2, 1 / n_Y^2, 1 / n_Z^2]; alpha=0.2)
 
     lines!(ax, [(0, 0, 0), (S_dir_hi_lo[1]...,)], color=1, colormap=:Paired_12, colorrange=(1, 12), label="S_high", linewidth=5, fxaa=true)
     lines!(ax, [(0, 0, 0), (S_dir_hi_lo[2]...,)], color=2, colormap=:Paired_12, colorrange=(1, 12), label="S_low", linewidth=5, fxaa=true)
@@ -407,9 +529,9 @@ function plot_refractiveindex(
     f = Figure()
     ax = Axis(f[1, 1], xlabel="Wavelength", ylabel="Refractive index")
 
-    plot_refractiveindex!(cr.n_x_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_x", colormap=Reverse(:Reds))
-    plot_refractiveindex!(cr.n_y_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_y", colormap=Reverse(:Greens))
-    plot_refractiveindex!(cr.n_z_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_z", colormap=Reverse(:Blues))
+    plot_refractiveindex!(cr.n_X_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_X", colormap=Reverse(:Reds))
+    plot_refractiveindex!(cr.n_Y_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_Y", colormap=Reverse(:Greens))
+    plot_refractiveindex!(cr.n_Z_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_Z", colormap=Reverse(:Blues))
     Legend(f[1, 2], ax)
     DataInspector(ax)
     return f
@@ -425,8 +547,8 @@ function plot_refractiveindex(
     f = Figure()
     ax = Axis(f[1, 1], xlabel="Wavelength", ylabel="Refractive index")
 
-    plot_refractiveindex!(cr.n_xy_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_x/n_y (e)", colormap=Reverse(:Reds))
-    plot_refractiveindex!(cr.n_z_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_z (o)", colormap=Reverse(:Blues))
+    plot_refractiveindex!(cr.n_XY_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_X/n_Y (e)", colormap=Reverse(:Reds))
+    plot_refractiveindex!(cr.n_Z_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_Z (o)", colormap=Reverse(:Blues))
     Legend(f[1, 2], ax)
     DataInspector(ax)
     return f

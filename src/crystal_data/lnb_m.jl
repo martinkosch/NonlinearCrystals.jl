@@ -34,12 +34,13 @@
 #     )
     
 
-#     d = construct_d_tensor(metadata[:pointgroup]; d22=2.46u"pm/V", d31=-4.64u"pm/V", d33=-41.7u"pm/V") # Measured at 1.058 µm
+#     d_XYZ_full = calc_d_XYZ_full(metadata[:pointgroup]; d22=2.46u"pm/V", d31=-4.64u"pm/V", d33=-41.7u"pm/V") # Measured at 1.058 µm
+
 #     LNB_M = UnidirectionalCrystal(
 #         metadata,
 #         n_o_principal,
 #         n_e_principal,
-#         d,
+#         d_XYZ_full,
 #     )
 #     return LNB_M
 # end

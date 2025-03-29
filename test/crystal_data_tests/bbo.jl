@@ -2,6 +2,8 @@ using NonlinearCrystals
 using Test
 using Unitful
 
+@test typeof(NonlinearCrystals.create_bbo()) <: UnidirectionalCrystal
+
 @test BBO.n_o_principal(default_lambda(BBO), default_temp(BBO)) > 1
 @test BBO.n_e_principal(default_lambda(BBO), default_temp(BBO)) > 1
 

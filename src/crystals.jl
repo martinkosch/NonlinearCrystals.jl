@@ -1,4 +1,4 @@
-export NonlinearCrystal, UnidirectionalCrystal, BidirectionalCrystal, default_lambda, default_temp, is_lambda_valid, valid_lambda_range, construct_d_tensor, optical_axis_angle, refraction_data_hi_lo, plot_birefringent_refraction, default_temp
+export NonlinearCrystal, UnidirectionalCrystal, BidirectionalCrystal, default_lambda, default_temp, is_lambda_valid, valid_lambda_range, calc_d_XYZ_full, optical_axis_angle, refraction_data_hi_lo, plot_birefringent_refraction, default_temp
 
 abstract type NonlinearCrystal end
 

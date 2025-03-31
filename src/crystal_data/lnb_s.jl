@@ -2,7 +2,7 @@ function create_lnb_s()
     metadata = Dict(
         :description => "LNB (Lithium Niobate, stoichiometric melt with mole ratio Li/Nb = 1.000)",
         :formula => "LiNbO₃",
-        :pointgroup => "3m",
+        :point_group => "3m",
         :lattice_params => (5.148u"Å", 5.148u"Å", 3.863u"Å"),
         :density => 4.628u"g/cm^3",
         :mohs_hardness => 5,
@@ -36,7 +36,7 @@ function create_lnb_s()
         temp_ref,
     )
 
-    d_XYZ_full = calc_d_XYZ_full(metadata[:pointgroup]; d22=2.46u"pm/V", d31=-4.64u"pm/V", d33=-41.7u"pm/V") # Measured at 1.058 µm
+    d_XYZ_full = calc_d_XYZ_full(metadata[:point_group]; d22=2.46u"pm/V", d31=-4.64u"pm/V", d33=-41.7u"pm/V") # Measured at 1.058 µm
     
     LNB_S = UnidirectionalCrystal(
         metadata,

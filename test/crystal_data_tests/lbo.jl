@@ -3,6 +3,7 @@ using Test
 using Unitful
 
 @test typeof(NonlinearCrystals.create_lbo()) <: BidirectionalCrystal
+@test isa(crystal_system(LBO), String)
 
 @test LBO.n_X_principal(default_lambda(LBO), default_temp(LBO)) > 1
 @test LBO.n_Y_principal(default_lambda(LBO), default_temp(LBO)) > 1

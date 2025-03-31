@@ -25,6 +25,21 @@ function all_bidirectionalcrystals()
     return subtypes_in_module(NonlinearCrystals, BidirectionalCrystal)
 end
 
+function auto_fmt(x; digits=3, sci_thresh=1e4, inf_thresh=1e10)
+    if isnan(x)
+        return "NaN"
+    elseif isinf(x) || abs(x) ≥ inf_thresh
+        return x > 0 ? "Inf" : "-Inf"
+    end
+
+    absx = abs(x)
+    if absx ≥ sci_thresh || (absx > 0 && absx < 0.01)
+        return @sprintf("%.*e", digits, x)
+    else
+        return @sprintf("%.*f", digits, x)
+    end
+end
+
 function draw_ellipsoid!(
     ax::Axis3,
     center::AbstractVector=[0.0, 0.0, 0.0],
@@ -184,8 +199,8 @@ function find_neighbors_within_distance(all_x, all_y, d)
     dists_within_d = [typeof(d)[] for i in eachindex(all_x)]
     for i in eachindex(all_x)
         idxs, dists = knn(tree, points[:, i], 6, true)
-        append!(indices_within_d[i], idxs[dists .<= ustrip(d)])
-        append!(dists_within_d[i], dists[dists .<= ustrip(d)] * Unitful.unit(d))
+        append!(indices_within_d[i], idxs[dists .≤ ustrip(d)])
+        append!(dists_within_d[i], dists[dists .≤ ustrip(d)] * Unitful.unit(d))
     end
 
     return indices_within_d, dists_within_d

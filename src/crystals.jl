@@ -69,7 +69,7 @@ function contract_d_tensor(d_full::AbstractArray{<:Number,3})
     return d_contract
 end
 
-function calc_rot_mat_from_assignment(axes_assignment_XYZ::NTuple{3,Symbol})
+function rot_mat_abc_to_XYZ(axes_assignment_XYZ::NTuple{3,Symbol})
     # Standard basis in XYZ
     basis_vectors = Dict(
         :X => [1.0, 0.0, 0.0],
@@ -91,17 +91,17 @@ function calc_rot_mat_from_assignment(axes_assignment_XYZ::NTuple{3,Symbol})
 end
 
 function calc_d_XYZ_full(
-    pointgroup::String,
-    axes_assignment_XYZ::Union{NTuple{3,Symbol},AbstractMatrix{<:Number}}=(:a, :b, :c),
+    point_group::String,
+    rot_mat::AbstractMatrix{<:Number}=I(3),
     use_kleinman::Bool=true;
     components_abc...
 )
     comps = [c[1] for c in components_abc]
     vals = [c[2] for c in components_abc]
-    sg = use_kleinman ? symmetry_groups_kleinman : symmetry_groups
+    sg = use_kleinman ? SYMMETRY_GROUPS_KLEINMAN : SYMMETRY_GROUPS
 
-    symmetry = get(sg, pointgroup, nothing)
-    symmetry !== nothing || error("Point group '$pointgroup' not defined.")
+    symmetry = get(sg, point_group, nothing)
+    symmetry !== nothing || error("Point group '$point_group' not defined.")
 
     # Iterate through each symmetry group to ensure consistency
     # Symmetry goups and given components are assumed to be specified in abc coordinates
@@ -132,8 +132,7 @@ function calc_d_XYZ_full(
         end
     end
 
-    # Rotate d tensor from abc coordinates to XYZ coordinates based on the provided assigment
-    rot_mat = isa(axes_assignment_XYZ, AbstractMatrix) ? axes_assignment_XYZ : calc_rot_mat_from_assignment(axes_assignment_XYZ)
+    # Rotate d tensor from the coordinates system of the given d tensor components to XYZ coordinates based on the provided assigment
     d_abc_full = expand_d_contract(d_abc)
     d_XYZ_full = rotate_tensor3(d_abc_full, rot_mat)
     return d_XYZ_full
@@ -209,7 +208,8 @@ struct UnidirectionalCrystal{TM,TE,TO,TD} <: NonlinearCrystal
         n_o_principal::RefractiveIndex,
         n_e_principal::RefractiveIndex,
         d_XYZ_ref_full::AbstractArray{<:Number,3};
-    )
+    )   
+        @assert haskey(metadata, :point_group) && haskey(POINT_GROUP_MAP, metadata[:point_group]) "Point group unknown or not specified in metadata. Possible values are:\n$(keys(NonlinearCrystals.POINT_GROUP_MAP))"
         return new{typeof(metadata),typeof(n_o_principal),typeof(n_e_principal),eltype(d_XYZ_ref_full)}(
             metadata, n_o_principal, n_e_principal, SArray{Tuple{3,3,3},eltype(d_XYZ_ref_full)}(d_XYZ_ref_full)
         )
@@ -245,7 +245,8 @@ struct BidirectionalCrystal{TM,TX,TY,TZ,TD} <: NonlinearCrystal
         d_XYZ_ref_full::AbstractArray{<:Number,3};
         warn_n_Z_smaller_n_X::Bool=true,
     )
-        warnstring = "n_Z_principal >= n_Y_principal >= n_X_principal should be used in this package for biaxial crystals$(haskey(metadata, :description) ? " but this is not fulfilled for crystal '$(metadata[:description])'." : ".")"
+        @assert haskey(metadata, :point_group) && haskey(POINT_GROUP_MAP, metadata[:point_group]) "Point group unknown or not specified in metadata. Possible values are:\n$(keys(NonlinearCrystals.POINT_GROUP_MAP))"
+        warnstring = "n_Z_principal ≥ n_Y_principal ≥ n_X_principal should be used in this package for biaxial crystals$(haskey(metadata, :description) ? " but this is not fulfilled for crystal '$(metadata[:description])'." : ".")"
         warn_n_Z_smaller_n_X && (n_Z_principal() < n_Y_principal() < n_X_principal()) && (@warn warnstring)
         return new{typeof(metadata),typeof(n_X_principal),typeof(n_Y_principal),typeof(n_Z_principal),eltype(d_XYZ_ref_full)}(
             metadata, n_X_principal, n_Y_principal, n_Z_principal, SArray{Tuple{3,3,3},eltype(d_XYZ_ref_full)}(d_XYZ_ref_full)

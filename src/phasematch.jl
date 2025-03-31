@@ -35,6 +35,12 @@ function CollinearPhaseMatch(
     theta_pm::Angle,
     phi_pm::Angle,
 )
+    # Sort red lambdas: r1 by definition always has a higher (or equal) wavelength than r2 
+    if lambda_r1_r2_b[1] < lambda_r1_r2_b[2]
+        lambda_r1_r2_b = lambda_r1_r2_b[[2, 1, 3]]
+        hi_or_lo_r1_r2_b = hi_or_lo_r1_r2_b[[2, 1, 3]]
+    end
+
     data_hi_lo_r1 = refraction_data_hi_lo(theta_pm, phi_pm, cr, lambda_r1_r2_b[1], temp)
     data_hi_lo_r2 = refraction_data_hi_lo(theta_pm, phi_pm, cr, lambda_r1_r2_b[2], temp)
     data_hi_lo_b = refraction_data_hi_lo(theta_pm, phi_pm, cr, lambda_r1_r2_b[3], temp)
@@ -103,7 +109,7 @@ function calc_unified_dir_signs(
     d_b_oa = dot(dir_vecs_r1_r2_b[3], first_optical_axis_b)
     d_b_ref = dot(dir_vecs_r1_r2_b[3], cross(S_dir_b, first_optical_axis_b))
     sign_b = (abs(d_b_oa) > abs(d_b_ref)) ? sign(d_b_oa) : sign(d_b_ref)
-    
+
     dir_ref = cross(dir_vecs_r1_r2_b[3], S_dir_b)
     d_r1_ref = dot(dir_ref, dir_vecs_r1_r2_b[1])
     d_r1_b = dot(dir_vecs_r1_r2_b[3], dir_vecs_r1_r2_b[1])
@@ -139,31 +145,76 @@ end
 
 function Base.show(io::IO, cpm::CollinearPhaseMatch)
     digits = 3
-    println(io, "Crystal: $(cpm.cr.metadata[:description])")
-    if !all(isnothing.(cpm.o_or_e_r1_r2_b))
-        println(io, "Wavelengths: λ_r1: $(round(u"nm", cpm.lambda_r1_r2_b[1]; digits)) ($(cpm.hi_or_lo_r1_r2_b[1])/$(cpm.o_or_e_r1_r2_b[1])) + λ_r2: $(round(u"nm", cpm.lambda_r1_r2_b[2]; digits)) ($(cpm.hi_or_lo_r1_r2_b[2])/$(cpm.o_or_e_r1_r2_b[2])) = λ_b: $(round(u"nm", cpm.lambda_r1_r2_b[3]; digits)) ($(cpm.hi_or_lo_r1_r2_b[3])/$(cpm.o_or_e_r1_r2_b[3]))")
+
+    @printf(io, "%-22s  %s\n", "Crystal:", cpm.cr.metadata[:description])
+
+    # Scalar values
+    @printf(io, "%-22s  θ: %6.3f°, ϕ: %6.3f°\n", "Angles:",
+        ustrip(u"°", cpm.theta_pm), ustrip(u"°", cpm.phi_pm))
+
+    @printf(io, "%-22s  %6.1f K (%5.2f °C)\n", "Temperature:",
+        ustrip(u"K", cpm.temp), ustrip(u"°C", cpm.temp))
+
+    @printf(io, "%-22s  %10.3f pm/V\n", "d_eff:",
+        ustrip(u"pm/V", round(u"pm/V", cpm.d_eff; digits)))
+
+    @printf(io, "%-22s  %10s W\n", "S₀ × L²:",
+        auto_fmt(ustrip(u"W", round(u"W", cpm.S_0; sigdigits=digits))))
+
+    println(io, "────────────────────────────────────────────────────────────")
+    @printf(io, "%-22s  %10s  %10s  %10s\n", "Quantity (unit)", "λ_r1", "λ_r2", "λ_b")
+    println(io, "────────────────────────────────────────────────────────────")
+
+    # Wavelengths (nm)
+    λs = ustrip.(u"nm", round.(u"nm", cpm.lambda_r1_r2_b; digits))
+    @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "Wavelength (nm):", λs...)
+
+    # Polarization types
+    pols = cpm.o_or_e_r1_r2_b
+    types = cpm.hi_or_lo_r1_r2_b
+    if !all(isnothing.(pols))
+        polar_str = ["$(types[i])/$(pols[i])" for i in 1:3]
+        @printf(io, "%-22s  %10s  %10s  %10s\n", "Type/Polarization:", polar_str...)
     else
-        println(io, "Wavelengths: λ_r1: $(round(u"nm", cpm.lambda_r1_r2_b[1]; digits)) ($(cpm.hi_or_lo_r1_r2_b[1])) + λ_r2: $(round(u"nm", cpm.lambda_r1_r2_b[2]; digits)) ($(cpm.hi_or_lo_r1_r2_b[2])) = λ_b: $(round(u"nm", cpm.lambda_r1_r2_b[3]; digits)) ($(cpm.hi_or_lo_r1_r2_b[3]))")
+        @printf(io, "%-22s  %10s  %10s  %10s\n", "Type/Polarization:", types...)
     end
-    println(io, "Temperature: $(float(cpm.temp |> u"K")) ($(float(cpm.temp |> u"°C")))")
-    println(io, "θ: $(round(u"°", cpm.theta_pm |> u"°"; digits)), ϕ: $(round(u"°", cpm.phi_pm |> u"°"; digits))")
-    println(io, "Walkoff: $(round(u"mrad", cpm.walkoff_angle_r1_r2_b[1] |> u"mrad"; digits)), $(round(u"mrad", cpm.walkoff_angle_r1_r2_b[2] |> u"mrad"; digits)), $(round(u"mrad", cpm.walkoff_angle_r1_r2_b[3] |> u"mrad"; digits))")
-    println(io, "Refractive index: $(round(cpm.refractive_index_r1_r2_b[1]; digits)), $(round(cpm.refractive_index_r1_r2_b[2]; digits)), $(round(cpm.refractive_index_r1_r2_b[3]; digits))")
-    println(io, "Group index: $(round(cpm.group_index_r1_r2_b[1]; digits)), $(round(cpm.group_index_r1_r2_b[2]; digits)), $(round(cpm.group_index_r1_r2_b[3]; digits))")
-    println(io, "GDD: $(round(u"fs^2/mm", cpm.beta_2_r1_r2_b[1]; digits)), $(round(u"fs^2/mm", cpm.beta_2_r1_r2_b[2]; digits)), $(round(u"fs^2/mm", cpm.beta_2_r1_r2_b[3]; digits))")
-    println(io, "TOD: $(round(u"fs^3/mm", cpm.beta_3_r1_r2_b[1]; digits)), $(round(u"fs^3/mm", cpm.beta_3_r1_r2_b[2]; digits)), $(round(u"fs^3/mm", cpm.beta_3_r1_r2_b[3]; digits))")
-    println(io, "d_eff: $(round(u"pm/V", cpm.d_eff; digits))")
-    println(io, "S_0 * L^2: $(round(u"W", cpm.S_0; sigdigits=digits))")
-    println(io, "ω_bandwidth(λ_r1=const.) * L: $(round(u"GHz * cm", cpm.lambda_L_bw[1]; digits))")
-    println(io, "ω_bandwidth(λ_r2=const.) * L: $(round(u"GHz * cm", cpm.lambda_L_bw[2]; digits))")
-    println(io, "ω_bandwidth(λ_b=const.) * L: $(round(u"GHz * cm", cpm.lambda_L_bw[3]; digits))")
-    println(io, "T_bandwidth * L: $(round(u"K * cm", cpm.temp_L_bw; digits))")
-    println(io, "θ_bandwidth * L: $(round(u"mrad * cm", cpm.theta_L_bw; digits))")
-    println(io, "ϕ_bandwidth * L: $(round(u"mrad * cm", cpm.phi_L_bw; digits))")
-    println(io, "E_dir: $(round.(cpm.E_dir_r1_r2_b[1]; digits)), $(round.(cpm.E_dir_r1_r2_b[2]; digits)), $(round.(cpm.E_dir_r1_r2_b[3]; digits))")
-    println(io, "D_dir: $(round.(cpm.D_dir_r1_r2_b[1]; digits)), $(round.(cpm.D_dir_r1_r2_b[2]; digits)), $(round.(cpm.D_dir_r1_r2_b[3]; digits))")
-    # println(io, "E_dir_angles: $(round.(u"°", vector_to_angles(cpm.E_dir_r1_r2_b[1]); digits)), $(round.(u"°", vector_to_angles(cpm.E_dir_r1_r2_b[2]); digits)), $(round.(u"°", vector_to_angles(cpm.E_dir_r1_r2_b[3]); digits))")
-    # println(io, "D_dir_angles: $(round.(u"°", vector_to_angles(cpm.D_dir_r1_r2_b[1]); digits)), $(round.(u"°", vector_to_angles(cpm.D_dir_r1_r2_b[2]); digits)), $(round.(u"°", vector_to_angles(cpm.D_dir_r1_r2_b[3]); digits))")
+
+    # Walkoff (mrad)
+    walkoffs = ustrip.(u"mrad", round.(u"mrad", cpm.walkoff_angle_r1_r2_b; digits))
+    @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "Walkoff (mrad):", walkoffs...)
+
+    # Indices
+    n = round.(cpm.refractive_index_r1_r2_b; digits)
+    ng = round.(cpm.group_index_r1_r2_b; digits)
+    @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "Refractive index:", n...)
+    @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "Group index:", ng...)
+
+    # GDD & TOD (fs²/mm, fs³/mm)
+    gdd = ustrip.(u"fs^2/mm", round.(u"fs^2/mm", cpm.beta_2_r1_r2_b; digits))
+    tod = ustrip.(u"fs^3/mm", round.(u"fs^3/mm", cpm.beta_3_r1_r2_b; digits))
+    @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "GDD (fs²/mm):", gdd...)
+    @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "TOD (fs³/mm):", tod...)
+
+    # E_dir and D_dir
+    e_dirs = ["[" * join(round.(v; digits), ", ") * "]" for v in cpm.E_dir_r1_r2_b]
+    d_dirs = ["[" * join(round.(v; digits), ", ") * "]" for v in cpm.D_dir_r1_r2_b]
+    @printf(io, "%-22s  %10s  %10s  %10s\n", "E_dir:", e_dirs...)
+    @printf(io, "%-22s  %10s  %10s  %10s\n", "D_dir:", d_dirs...)
+
+    # Bandwidths
+    bw = auto_fmt.(ustrip.(u"GHz*cm", round.(u"GHz*cm", cpm.lambda_L_bw; digits)))
+    @printf(io, "%-22s  %10s  %10s  %10s\n", "ω BW × L (GHz·cm):", bw...)
+
+    @printf(io, "%-22s  %10s\n", "T BW × L (K·cm):",
+        auto_fmt(ustrip(u"K*cm", round(u"K*cm", cpm.temp_L_bw; digits))))
+
+    @printf(io, "%-22s  %10s\n", "θ BW × L (mrad·cm):",
+        auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", cpm.theta_L_bw; digits))))
+
+    @printf(io, "%-22s  %10s\n", "ϕ BW × L (mrad·cm):",
+        auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", cpm.phi_L_bw; digits))))
+
+    println(io, "────────────────────────────────────────────────────────────")
 end
 
 function pm_wavelengths(;
@@ -185,6 +236,9 @@ function pm_wavelengths(;
         @assert (!isnothing(lambda_r1) && !isnothing(lambda_r2))
         lambda_b = 1 / (1 / lambda_r1 + 1 / lambda_r2)
     end
+
+    # Sort red lambdas: r1 by definition always has a higher (or equal) wavelength than r2 
+    lambda_r1 < lambda_r2 && ((lambda_r1, lambda_r2) = (lambda_r2, lambda_r1))
 
     @assert 1 / lambda_r1 + 1 / lambda_r2 ≈ 1 / lambda_b "Phasematching is only fulfilled for 1 / λ_r1 + 1 / λ_r2 = 1 / λ_b."
 
@@ -214,9 +268,9 @@ function delta_k(
     lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
     @assert all([p in [:hi, :lo] for p in hi_or_lo_r1_r2_b])
 
-    n_r1 = hi_or_lo_r1_r2_b[1] == :hi ? refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_r1, temp; n_hi_lo_only=true)[1] : refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_r1, temp; n_hi_lo_only=true)[2]
-    n_r2 = hi_or_lo_r1_r2_b[2] == :hi ? refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_r2, temp; n_hi_lo_only=true)[1] : refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_r2, temp; n_hi_lo_only=true)[2]
-    n_b = hi_or_lo_r1_r2_b[3] == :hi ? refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_b, temp; n_hi_lo_only=true)[1] : refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_b, temp; n_hi_lo_only=true)[2]
+    n_r1 = refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_r1, temp; n_hi_lo_only=true)[hi_or_lo_r1_r2_b[1] == :hi ? 1 : 2]
+    n_r2 = refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_r2, temp; n_hi_lo_only=true)[hi_or_lo_r1_r2_b[2] == :hi ? 1 : 2]
+    n_b = refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_b, temp; n_hi_lo_only=true)[hi_or_lo_r1_r2_b[3] == :hi ? 1 : 2]
 
     return 2π * (n_r1 / lambda_r1 + n_r2 / lambda_r2 - n_b / lambda_b)
 end
@@ -476,7 +530,7 @@ function find_all_pms_along_dimension(
         @assert !isnothing(temp_fixed) "Fix temperature by selecting temp_min = temp_max if searching along fixed θ or ϕ directions."
         return _pms_vs_angle(pol_r1_r2_b, cr; lambda_r1=lambda_r1_fixed, lambda_r2=lambda_r2_fixed, lambda_b=lambda_b_fixed, temp=temp_fixed, theta_fixed, phi_fixed, ngrid, tol)
     end
-    
+
     red_fixed_count = count(.!isnothing.([lambda_r1_fixed, lambda_r2_fixed]))
     @assert (count(.!isnothing.([temp_fixed, lambda_b_fixed])) + red_fixed_count) == 2 "You must provide exactly two of those: (temp_min == temp_max), lambda_b_fixed, lambda_r1_fixed, and lambda_r2_fixed."
 
@@ -610,7 +664,7 @@ function _pms_vs_lambda_r1(θ_ϕs, hi_or_lo_r1_r2_b, cr, λb, temp, λmin, λmax
 
     for θ_ϕ in θ_ϕs
         if λmax < 1 / (1 / λb - 1 / λmax)
-        # if min(λmax, 1 / (1 / λb - 1 / λmax)) < max(λmin, 2 * λb)
+            # if min(λmax, 1 / (1 / λb - 1 / λmax)) < max(λmin, 2 * λb)
             λr1_range = []
         else
             λr1_range = range(

@@ -3,7 +3,7 @@
 #     metadata = Dict(
 #         :description => "LNB (Lithium Niobate, Magnesium-Oxide-Doped with 5 mole % MgO)",
 #         :formula => "MgO:LiNbO₃",
-#         :pointgroup => "3m",
+#         :point_group => "3m",
 #         :lattice_params => (5.148u"Å", 5.148u"Å", 3.863u"Å"),
 #         :density => 4.628u"g/cm^3",
 #         :mohs_hardness => 5,
@@ -34,7 +34,7 @@
 #     )
     
 
-#     d_XYZ_full = calc_d_XYZ_full(metadata[:pointgroup]; d22=2.46u"pm/V", d31=-4.64u"pm/V", d33=-41.7u"pm/V") # Measured at 1.058 µm
+#     d_XYZ_full = calc_d_XYZ_full(metadata[:point_group]; d22=2.46u"pm/V", d31=-4.64u"pm/V", d33=-41.7u"pm/V") # Measured at 1.058 µm
 
 #     LNB_M = UnidirectionalCrystal(
 #         metadata,

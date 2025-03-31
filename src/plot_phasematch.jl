@@ -48,7 +48,7 @@ function calc_raw_noncritical_pm_lines(
         lambda_b = range_lambda_b[i_b]
         lambda_r12 = range_lambda_r12[i_r12]
         lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_b, lambda_r1=lambda_r12)
-        if is_lambda_valid(lambda_r2, cr)
+        if is_lambda_valid(lambda_r1, cr) && is_lambda_valid(lambda_r2, cr) && is_lambda_valid(lambda_b, cr)
             all_delta_k[i_b, i_r12] = ustrip(u"m^-1", delta_k(axes_to_θ_ϕ(principal_axis)[1]..., hi_or_lo_r1_r2_b, cr; temp, lambda_r1, lambda_r2, lambda_b))
         else
             all_delta_k[i_b, i_r12] = NaN
@@ -390,7 +390,7 @@ function compute_delta_k_grid(
     θ_range = LinRange(0, π, n_points) * u"rad"
     ϕ_range = LinRange(0, 2π, 2 * n_points) * u"rad"
 
-    # TODO: Use symmetry information from cr.metadata[:pointgroup] for speedup
+    # TODO: Use symmetry information from cr.metadata[:point_group] for speedup
     if isa(cr, UnidirectionalCrystal)
         # No ϕ dependence, compute only one value and repeat
         all_delta_k = [

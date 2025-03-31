@@ -109,7 +109,7 @@ struct SellmeierFunction{FL,LR,TF,TR} <: RefractiveIndex
 end
 
 function is_lambda_valid(lambda::Length, sri::SellmeierFunction; warn_tol::Length=1u"nm")
-    return lambda >= (sri.lambda_range[1] - warn_tol) && lambda <= (sri.lambda_range[2] + warn_tol)
+    return lambda ≥ (sri.lambda_range[1] - warn_tol) && lambda ≤ (sri.lambda_range[2] + warn_tol)
 end
 
 function refractive_index(

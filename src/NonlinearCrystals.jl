@@ -1,5 +1,6 @@
 module NonlinearCrystals
 
+import Printf: @printf, @sprintf
 using StaticArrays
 using LinearAlgebra 
 using Tullio 
@@ -25,8 +26,8 @@ COLORMAP_HEATMAP = :vik
 # Includes
 include("utils.jl")
 include("refractive_index.jl")
-include("crystal_symmetry.jl")
 include("crystals.jl")
+include("crystal_symmetry.jl")
 include("phasematch.jl")
 include("plot_phasematch.jl")
 

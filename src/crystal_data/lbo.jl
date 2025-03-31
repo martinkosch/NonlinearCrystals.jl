@@ -2,7 +2,7 @@ function create_lbo()
     metadata = Dict(
         :description => "LBO (Lithium Triborate)",
         :formula => "LiB₃0₅",
-        :pointgroup => "mm2",
+        :point_group => "mm2",
         :lattice_params => (8.447u"Å", 7.380u"Å", 5.120u"Å"),
         :density => 2.47u"g/cm^3",
         :mohs_hardness => 6,
@@ -47,7 +47,8 @@ function create_lbo()
         temp_ref,
     )
 
-    d_XYZ_full = calc_d_XYZ_full(metadata[:pointgroup], metadata[:axes_assignment_XYZ]; d31=-0.67u"pm/V", d32=0.85u"pm/V", d33=0.04u"pm/V")
+    rot_mat = rot_mat_abc_to_XYZ(metadata[:axes_assignment_XYZ])
+    d_XYZ_full = calc_d_XYZ_full(metadata[:point_group], rot_mat; d31=-0.67u"pm/V", d32=0.85u"pm/V", d33=0.04u"pm/V")
     
     LBO = BidirectionalCrystal(
         metadata,

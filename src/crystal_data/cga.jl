@@ -2,7 +2,7 @@ function create_cga()
     metadata = Dict(
         :description => "CGA (Cadmium germanium arsenide)",
         :formula => "CdGeAs₂",
-        :pointgroup => "-42m",
+        :point_group => "-42m",
         :lattice_params => (1.26512u"nm", 1.26512u"nm", 2.54435u"nm"),
         :density => 5.6u"g/cm^3",
         :mohs_hardness => 4,
@@ -25,7 +25,7 @@ function create_cga()
         temp_ref,
     )
 
-    d_XYZ_full = calc_d_XYZ_full(metadata[:pointgroup]; d14=235.0u"pm/V")
+    d_XYZ_full = calc_d_XYZ_full(metadata[:point_group]; d14=235.0u"pm/V")
 
     CGA = UnidirectionalCrystal(
         metadata,

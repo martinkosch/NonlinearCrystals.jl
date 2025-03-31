@@ -2,7 +2,7 @@ function create_ktp_f()
     metadata = Dict(
         :description => "Flux-grown KTP (Potassium titanyl phosphate)",
         :formula => "KTiOP0₄",
-        :pointgroup => "mm2",
+        :point_group => "mm2",
         :lattice_params => (6.404u"Å", 10.616u"Å", 12.814u"Å"),
         :density => 2.945u"g/cm^3",
         :mohs_hardness => 5,
@@ -44,7 +44,7 @@ function create_ktp_f()
         temp_ref,
     )
 
-    d_XYZ_full = calc_d_XYZ_full(metadata[:pointgroup]; d31=1.95u"pm/V", d32=3.9u"pm/V", d33=15.3u"pm/V")
+    d_XYZ_full = calc_d_XYZ_full(metadata[:point_group]; d31=1.95u"pm/V", d32=3.9u"pm/V", d33=15.3u"pm/V")
 
     KTP_F = BidirectionalCrystal(
         metadata,

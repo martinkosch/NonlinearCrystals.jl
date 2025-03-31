@@ -3,6 +3,7 @@ using Test
 using Unitful
 
 @test typeof(NonlinearCrystals.create_ktp_h()) <: BidirectionalCrystal
+@test isa(crystal_system(KTP_H), String)
 
 @test KTP_H.n_X_principal(default_lambda(KTP_H), default_temp(KTP_H)) > 1
 @test KTP_H.n_Y_principal(default_lambda(KTP_H), default_temp(KTP_H)) > 1

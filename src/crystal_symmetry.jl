@@ -1,7 +1,66 @@
-export plot_symmetry
+export crystal_system, plot_symmetry
+
+# Mapping from point group to crystal system
+const POINT_GROUP_MAP = Dict(
+    # Triclinic
+    "1"     => "Triclinic",
+    "-1"    => "Triclinic",
+
+    # Monoclinic
+    "2"     => "Monoclinic",
+    "2/m"   => "Monoclinic",
+    "m"     => "Monoclinic",
+
+    # Orthorhombic
+    "222"   => "Orthorhombic",
+    "mm2"   => "Orthorhombic",
+    "mmm"   => "Orthorhombic",
+
+    # Tetragonal
+    "4"     => "Tetragonal",
+    "-4"    => "Tetragonal",
+    "4/m"   => "Tetragonal",
+    "422"   => "Tetragonal",
+    "4mm"   => "Tetragonal",
+    "-42m"  => "Tetragonal",
+    "4/mmm" => "Tetragonal",
+
+    # Trigonal (Rhombohedral)
+    "3"     => "Trigonal",
+    "-3"    => "Trigonal",
+    "32"   => "Trigonal",
+    "3m"    => "Trigonal",
+    "-3m"   => "Trigonal",
+
+    # Hexagonal
+    "6"     => "Hexagonal",
+    "-6"    => "Hexagonal",
+    "6/m"   => "Hexagonal",
+    "622"   => "Hexagonal",
+    "6mm"   => "Hexagonal",
+    "-6m2"  => "Hexagonal",
+    "6/mmm" => "Hexagonal",
+
+    # Cubic
+    "23"    => "Cubic",
+    "m-3"    => "Cubic",
+    "432"   => "Cubic",
+    "-43m"  => "Cubic",
+    "m-3m"   => "Cubic"
+)
+
+function crystal_system(point_group::AbstractString) 
+    if haskey(POINT_GROUP_MAP, point_group)
+        return POINT_GROUP_MAP[point_group]
+    else
+        @error "Point group '$(point_group)' is unknown."
+    end
+end
+
+crystal_system(cr::NonlinearCrystal) = crystal_system(cr.metadata[:point_group])
 
 # From Frits Zernike, John E. Midwinter: Applied Nonlinear Optics
-const symmetry_groups_kleinman = Dict(
+const SYMMETRY_GROUPS_KLEINMAN = Dict(
     # Pairs of related coefficients based on Kleinman's symmetry conditions and sign relations within each component group 
     "1" => [
         ([:d11], [1]),
@@ -94,7 +153,7 @@ const symmetry_groups_kleinman = Dict(
 
 # From Frits Zernike, John E. Midwinter: Applied Nonlinear Optics
 # Pairs of related coefficients due to the point group and sign relations within each component group 
-const symmetry_groups = Dict(
+const SYMMETRY_GROUPS = Dict(
     "1" => [
         ([:d11], [1]),
         ([:d21], [1]),
@@ -223,13 +282,13 @@ const symmetry_groups = Dict(
 function find_zero_under_kleinman(pg::String)
     # Gather all coefficients from normal symmetry
     normal_coefs = Set{Symbol}()
-    for (coefs, _) in get(symmetry_groups, pg, [])
+    for (coefs, _) in get(SYMMETRY_GROUPS, pg, [])
         union!(normal_coefs, coefs)
     end
 
     # Gather all coefficients from Kleinman symmetry
     kleinman_coefs = Set{Symbol}()
-    for (coefs, _) in get(symmetry_groups_kleinman, pg, [])
+    for (coefs, _) in get(SYMMETRY_GROUPS_KLEINMAN, pg, [])
         union!(kleinman_coefs, coefs)
     end
 
@@ -237,7 +296,7 @@ function find_zero_under_kleinman(pg::String)
     return setdiff(normal_coefs, kleinman_coefs)
 end
 
-function plot_symmetry(group_name)
+function plot_symmetry(point_group::AbstractString)
     # Coordinates for each d_ij in a 6×3 grid
     coords = Dict(
         :d11 => (1, 3), :d12 => (2, 3), :d13 => (3, 3), :d14 => (4, 3), :d15 => (5, 3), :d16 => (6, 3),
@@ -246,7 +305,7 @@ function plot_symmetry(group_name)
     )
 
     fig = Figure(size=(600, 300))
-    ax = Axis(fig[1, 1], title="Class: $group_name")
+    ax = Axis(fig[1, 1], title="Class: $point_group")
 
     # Mark all points as small black dots initially
     for (comp, (x, y)) in coords
@@ -254,7 +313,7 @@ function plot_symmetry(group_name)
     end
 
     # Compute the set of coefficients that vanish under Kleinman
-    zero_k_set = find_zero_under_kleinman(group_name)
+    zero_k_set = find_zero_under_kleinman(point_group)
 
     # Helper: draw connections
     function draw_connections(groups, linestyle=:solid; is_kleinman=false)
@@ -283,11 +342,11 @@ function plot_symmetry(group_name)
     end
 
     # 1) Always‐valid symmetries (solid lines)
-    main_groups = get(symmetry_groups, group_name, [])
+    main_groups = get(SYMMETRY_GROUPS, point_group, [])
     draw_connections(main_groups, :solid; is_kleinman=false)
 
     # 2) Kleinman‐only symmetries (dashed lines)
-    all_kgroups = get(symmetry_groups_kleinman, group_name, [])
+    all_kgroups = get(SYMMETRY_GROUPS_KLEINMAN, point_group, [])
     # remove any that appear identically in main_groups
     # so only truly "extra" Kleinman sets get drawn as dashed
     unique_kleinman_groups = setdiff(all_kgroups, main_groups)
@@ -312,3 +371,5 @@ function plot_symmetry(group_name)
 
     fig
 end
+
+plot_symmetry(cr::NonlinearCrystal) = plot_symmetry(cr.metadata[:point_group])

@@ -40,6 +40,10 @@ function auto_fmt(x; digits=3, sci_thresh=1e4, inf_thresh=1e10)
     end
 end
 
+function vec_str(v::AbstractVector{<:Number}; digits::Integer=3) 
+    return "[" * join(round.(v; digits), ", ") * "]"
+end
+
 function draw_ellipsoid!(
     ax::Axis3,
     center::AbstractVector=[0.0, 0.0, 0.0],
@@ -101,7 +105,7 @@ function bool_permutations(val1, val2, n::Integer)
                 perm[j] = val1
             end
         end
-        push!(result, perm)
+        push!(result, Tuple(perm))
     end
 
     return result
@@ -112,9 +116,9 @@ function eigen_2d(A::AbstractMatrix)
     discr = sqrt(max(0.0, ((a + d) / 2)^2 - (a * d - b * c))) # Bound from below to avoid numerical issues
     eigvals = (a + d) / 2 .+ [-discr, discr]
 
-    eigvecs_orth1 = [[b, eigvals[1] - a], [eigvals[1] - d, c]]
+    eigvecs_orth1 = [(@SVector [b, eigvals[1] - a]), (@SVector [eigvals[1] - d, c])]
     idx_ev1 = findmax(norm.(eigvecs_orth1))[2]
-    eigvecs_orth2 = [[b, eigvals[2] - a], [eigvals[2] - d, c]]
+    eigvecs_orth2 = [(@SVector [b, eigvals[2] - a]), (@SVector [eigvals[2] - d, c])]
     idx_ev2 = findmax(norm.(eigvecs_orth2))[2]
     eigvecs_orth = [normalize(eigvecs_orth1[idx_ev1]) normalize(eigvecs_orth2[idx_ev2])]
     return eigvals, eigvecs_orth
@@ -199,8 +203,8 @@ function find_neighbors_within_distance(all_x, all_y, d)
     dists_within_d = [typeof(d)[] for i in eachindex(all_x)]
     for i in eachindex(all_x)
         idxs, dists = knn(tree, points[:, i], 6, true)
-        append!(indices_within_d[i], idxs[dists .≤ ustrip(d)])
-        append!(dists_within_d[i], dists[dists .≤ ustrip(d)] * Unitful.unit(d))
+        append!(indices_within_d[i], idxs[dists.≤ustrip(d)])
+        append!(dists_within_d[i], dists[dists.≤ustrip(d)] * Unitful.unit(d))
     end
 
     return indices_within_d, dists_within_d

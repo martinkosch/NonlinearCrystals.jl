@@ -43,7 +43,7 @@ d2n = NonlinearCrystals.d2n_dλ2(sri, 1.0u"µm", T_test)
 β3_val = β3(sri, λ_test, T_test)
 @test isapprox(uconvert(u"s^3/m", β3_val), 0.0u"s^3/m", atol=0.01u"fs^3/mm")
 
-# Test group index and velocities
+# Test group velocity index and velocities
 g_idx = group_index(sri, λ_test, T_test)
 @test unit(g_idx) == Unitful.NoUnits
 @test g_idx > 0.0  # physically meaningful

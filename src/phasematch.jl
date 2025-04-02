@@ -1,147 +1,173 @@
 export PhaseMatch, CollinearPhaseMatch, pm_wavelengths, find_all_pms_along_dimension, find_nearest_pm_along_lambda_r_b, find_nearest_pm_along_theta_phi, delta_k
 
-abstract type PhaseMatch end
-
-#TODO: Explicitly set all types with units for compilation speedup
-struct CollinearPhaseMatch{LT,TT,OT,AT,IT,WT,DT,ET,ST,RT,GT,B2T,B3T,FT,FS,LBW,TBW,HBW,PBW,CT} <: PhaseMatch
-    lambda_r1_r2_b::Vector{<:LT}
-    temp::TT
-    hi_or_lo_r1_r2_b::Vector{Symbol}
-    o_or_e_r1_r2_b::OT
-    theta_pm::AT
-    phi_pm::IT
-    walkoff_angle_r1_r2_b::Vector{<:WT}
-    D_dir_r1_r2_b::Vector{<:DT}
-    E_dir_r1_r2_b::Vector{<:ET}
-    S_dir_r1_r2_b::Vector{<:ST}
-    refractive_index_r1_r2_b::Vector{<:RT}
-    group_index_r1_r2_b::Vector{<:GT}
-    beta_2_r1_r2_b::Vector{<:B2T}
-    beta_3_r1_r2_b::Vector{<:B3T}
-    d_eff::FT
-    S_0::FS
-    lambda_L_bw::LBW
-    temp_L_bw::TBW
-    theta_L_bw::HBW
-    phi_L_bw::PBW
+struct PMCollinearData{CT<:NonlinearCrystal}
+    hi_or_lo_rrb::NTuple{3,Symbol}
+    theta_pm::typeof(1.0u"rad")
+    phi_pm::typeof(1.0u"rad")
     cr::CT
+    lambda_rrb::NTuple{3,typeof(1.0u"m")}
+    temp::typeof(1.0u"K")
 end
 
-function CollinearPhaseMatch(
-    cr::NonlinearCrystal,
-    lambda_r1_r2_b::AbstractVector{<:Length},
-    temp::Temperature,
-    hi_or_lo_r1_r2_b::AbstractVector{<:Symbol},
-    theta_pm::Angle,
-    phi_pm::Angle,
-)
-    # Sort red lambdas: r1 by definition always has a higher (or equal) wavelength than r2 
-    if lambda_r1_r2_b[1] < lambda_r1_r2_b[2]
-        lambda_r1_r2_b = lambda_r1_r2_b[[2, 1, 3]]
-        hi_or_lo_r1_r2_b = hi_or_lo_r1_r2_b[[2, 1, 3]]
-    end
+struct PMRefractionData
+    n_rrb::NTuple{3,Float64}
+    group_index_rrb::NTuple{3,Float64}
+    walkoff_angle_rrb::NTuple{3,typeof(1.0u"rad")}
+    D_dir_rrb::NTuple{3,SVector{3,Float64}}
+    E_dir_rrb::NTuple{3,SVector{3,Float64}}
+    S_dir_rrb::NTuple{3,SVector{3,Float64}}
+    beta0_rrb::NTuple{3,typeof(1.0u"m^-1")}
+    beta1_rrb::NTuple{3,typeof(1.0u"s * m^-1")}
+    beta2_rrb::NTuple{3,typeof(1.0u"s^2 * m^-1")}
+    beta3_rrb::NTuple{3,typeof(1.0u"s^3 * m^-1")}
+end
 
-    data_hi_lo_r1 = refraction_data_hi_lo(theta_pm, phi_pm, cr, lambda_r1_r2_b[1], temp)
-    data_hi_lo_r2 = refraction_data_hi_lo(theta_pm, phi_pm, cr, lambda_r1_r2_b[2], temp)
-    data_hi_lo_b = refraction_data_hi_lo(theta_pm, phi_pm, cr, lambda_r1_r2_b[3], temp)
-    data_hi_lo = [data_hi_lo_r1, data_hi_lo_r2, data_hi_lo_b]
+function PMRefractionData(rd_rrb::NTuple{3,<:RefractionData})
+    # Flip the signs of all field direction vectors (until here chosen randomly) to avoid sign jumps in d_eff
+    unified_dir_signs = calc_unified_dir_signs(rd_rrb)
 
-    select_hi_lo = data -> [(hi_or_lo_r1_r2_b[i] == :hi ? data[i][1] : data[i][2]) for i in eachindex(lambda_r1_r2_b)]
-    refractive_index_r1_r2_b = select_hi_lo([d[1] for d in data_hi_lo])
-    D_dir_r1_r2_b = select_hi_lo([d[2] for d in data_hi_lo])
-    E_dir_r1_r2_b = select_hi_lo([d[3] for d in data_hi_lo])
-    S_dir_r1_r2_b = select_hi_lo([d[4] for d in data_hi_lo])
-    walkoff_angle_r1_r2_b = select_hi_lo([d[5] for d in data_hi_lo])
-    group_index_r1_r2_b = select_hi_lo([d[6] for d in data_hi_lo])
-    # beta_0_r1_r2_b = select_hi_lo([d[7] for d in data_hi_lo])
-    # beta_1_r1_r2_b = select_hi_lo([d[8] for d in data_hi_lo])
-    beta_2_r1_r2_b = select_hi_lo([d[9] for d in data_hi_lo])
-    beta_3_r1_r2_b = select_hi_lo([d[10] for d in data_hi_lo])
+    return PMRefractionData(
+        Tuple(r.n for r in rd_rrb), 
+        Tuple(r.group_index for r in rd_rrb), 
+        Tuple(r.walkoff_angle for r in rd_rrb), 
+        Tuple(r.D_dir for r in rd_rrb) .* unified_dir_signs,
+        Tuple(r.E_dir for r in rd_rrb) .* unified_dir_signs,
+        Tuple(r.S_dir for r in rd_rrb), 
+        Tuple(r.beta0 for r in rd_rrb), 
+        Tuple(r.beta1 for r in rd_rrb), 
+        Tuple(r.beta2 for r in rd_rrb), 
+        Tuple(r.beta3 for r in rd_rrb), 
+    )
+end
 
-    # Assert that the signs of all field direction vectors (until here chosen randomly) are unified, e.g. all high-index directions point in the same direction 
-    first_optical_axis_b = angles_to_vector(optical_axis_angle(cr, lambda_r1_r2_b[3], temp), 0.0u"°")
-    unified_dir_signs = calc_unified_dir_signs(E_dir_r1_r2_b, S_dir_r1_r2_b[3], first_optical_axis_b)
-    D_dir_r1_r2_b = unified_dir_signs .* D_dir_r1_r2_b
-    E_dir_r1_r2_b = unified_dir_signs .* E_dir_r1_r2_b
+PMRefractionData(rd_r1::RefractionData, rd_r2::RefractionData, rd_b::RefractionData) = PMRefractionData((rd_r1, rd_r2, rd_b))
 
-    o_or_e_r1_r2_b = assign_e_o(E_dir_r1_r2_b, cr; use_o_e_for_biaxial=true)
+struct PMEfficiencyData
+    d_eff::typeof(1.0u"m/V")
+    S0_Lsquared::typeof(1.0u"W")
+end
 
-    d_eff = calc_d_eff(cr, E_dir_r1_r2_b...)
-    S_0 = (ε_0 * c_0 * lambda_r1_r2_b[1] * lambda_r1_r2_b[2] * prod(refractive_index_r1_r2_b)) / (8 * π^2 * d_eff^2)
-
-    lambda_L_bw = lambda_L_bandwidths(group_index_r1_r2_b)
-    temp_L_bw = temperature_L_bandwidth(theta_pm, phi_pm, hi_or_lo_r1_r2_b, cr; lambda_r1=lambda_r1_r2_b[1], lambda_r2=lambda_r1_r2_b[2], lambda_b=lambda_r1_r2_b[3], temp)
-    theta_L_bw = theta_L_bandwidth(theta_pm, phi_pm, hi_or_lo_r1_r2_b, cr; lambda_r1=lambda_r1_r2_b[1], lambda_r2=lambda_r1_r2_b[2], lambda_b=lambda_r1_r2_b[3], temp)
-    phi_L_bw = phi_L_bandwidth(theta_pm, phi_pm, hi_or_lo_r1_r2_b, cr; lambda_r1=lambda_r1_r2_b[1], lambda_r2=lambda_r1_r2_b[2], lambda_b=lambda_r1_r2_b[3], temp)
-
-    return CollinearPhaseMatch(
-        lambda_r1_r2_b,
-        temp,
-        hi_or_lo_r1_r2_b,
-        o_or_e_r1_r2_b,
-        theta_pm,
-        phi_pm,
-        walkoff_angle_r1_r2_b,
-        D_dir_r1_r2_b,
-        E_dir_r1_r2_b,
-        S_dir_r1_r2_b,
-        refractive_index_r1_r2_b,
-        group_index_r1_r2_b,
-        beta_2_r1_r2_b,
-        beta_3_r1_r2_b,
+function PMEfficiencyData(pm_data::PMCollinearData, refr_data::PMRefractionData)
+    d_eff = calc_d_eff(pm_data.cr, refr_data.E_dir_rrb...)
+    S_0_Lsquared = (ε_0 * c_0 * pm_data.lambda_rrb[1] * pm_data.lambda_rrb[2] * prod(refr_data.n_rrb)) / (8 * π^2 * d_eff^2)
+    return PMEfficiencyData(
         d_eff,
-        S_0,
+        S_0_Lsquared,
+    )
+end
+
+struct PMBandwidthData
+    lambda_L_bw::NTuple{3,typeof(1.0u"Hz*m")}
+    temp_L_bw::typeof(1.0u"K*m")
+    theta_L_bw::typeof(1.0u"rad*m")
+    phi_L_bw::typeof(1.0u"rad*m")
+end
+
+function PMBandwidthData(pm_data::PMCollinearData, refr_data::PMRefractionData)
+    lambda_L_bw = lambda_L_bandwidths(refr_data)
+    temp_L_bw = temperature_L_bandwidth(pm_data) 
+    theta_L_bw = theta_L_bandwidth(pm_data) 
+    phi_L_bw = phi_L_bandwidth(pm_data) 
+    return PMBandwidthData(
         lambda_L_bw,
         temp_L_bw,
         theta_L_bw,
         phi_L_bw,
-        cr,
     )
 end
 
-function calc_unified_dir_signs(
-    dir_vecs_r1_r2_b::AbstractVector{<:AbstractVector{<:Number}},
-    S_dir_b::AbstractVector{<:Number},
-    first_optical_axis_b::AbstractVector{<:Number}
+abstract type PhaseMatch end
+
+struct CollinearPhaseMatch{CT<:NonlinearCrystal} <: PhaseMatch
+    pm_data::PMCollinearData{CT}
+    refr_data::PMRefractionData
+    eff_data::PMEfficiencyData
+    bw_data::PMBandwidthData
+end
+
+function Base.getproperty(cpm::CollinearPhaseMatch, sym::Symbol)
+    # Forward PMCollinearData and PMRefractionData field requests
+    if sym in fieldnames(PMCollinearData)
+        return getfield(cpm.pm_data, sym)
+    elseif sym in fieldnames(PMRefractionData)
+        return getfield(cpm.refr_data, sym)
+    else # Fallback to real fields
+        return getfield(cpm, sym)
+    end
+end
+
+function CollinearPhaseMatch(
+    cr::NonlinearCrystal,
+    lambda_rrb::NTuple{3,Length},
+    temp::Temperature,
+    hi_or_lo_rrb::NTuple{3,Symbol},
+    theta_pm::Angle,
+    phi_pm::Angle,
 )
+    # Sort red lambdas: r1 by definition always has a higher (or equal) wavelength than r2 
+    if lambda_rrb[1] < lambda_rrb[2]
+        lambda_rrb = lambda_rrb[[2, 1, 3]]
+        hi_or_lo_rrb = hi_or_lo_rrb[[2, 1, 3]]
+    end
+
+    pm_data = PMCollinearData{typeof(cr)}(hi_or_lo_rrb, theta_pm, phi_pm, cr, lambda_rrb, temp)
+
+    rd_r1 = RefractionData(hi_or_lo_rrb[1], theta_pm, phi_pm, cr, lambda_rrb[1]; temp)
+    rd_r2 = RefractionData(hi_or_lo_rrb[2], theta_pm, phi_pm, cr, lambda_rrb[2]; temp)
+    rd_b = RefractionData(hi_or_lo_rrb[3], theta_pm, phi_pm, cr, lambda_rrb[3]; temp)
+
+    refr_data = PMRefractionData(rd_r1, rd_r2, rd_b)
+    eff_data = PMEfficiencyData(pm_data, refr_data)
+    bw_data = PMBandwidthData(pm_data, refr_data)
+
+    # o_or_e_rrb = assign_e_o(E_dir_rrb, cr; use_o_e_for_biaxial=true)
+    return CollinearPhaseMatch{typeof(cr)}(pm_data, refr_data, eff_data , bw_data)
+end
+
+function calc_unified_dir_signs(
+    rd_rrb::NTuple{3,<:RefractionData}
+)
+    E_dir_rrb = Tuple(r.E_dir for r in rd_rrb)
+    first_optical_axis_b = angles_to_vector(optical_axis_angle(rd_rrb[3].cr, rd_rrb[3].lambda, rd_rrb[3].temp), 0.0u"°")
+
     # TODO: Check this and the signs of d_eff at opposite hemispheres
     # This sign correction is supposed to prevent sign jumps, e.g. in d_eff
-    d_b_oa = dot(dir_vecs_r1_r2_b[3], first_optical_axis_b)
-    d_b_ref = dot(dir_vecs_r1_r2_b[3], cross(S_dir_b, first_optical_axis_b))
+    d_b_oa = dot(E_dir_rrb[3], first_optical_axis_b)
+    d_b_ref = dot(E_dir_rrb[3], cross(rd_rrb[3].S_dir, first_optical_axis_b))
     sign_b = (abs(d_b_oa) > abs(d_b_ref)) ? sign(d_b_oa) : sign(d_b_ref)
 
-    dir_ref = cross(dir_vecs_r1_r2_b[3], S_dir_b)
-    d_r1_ref = dot(dir_ref, dir_vecs_r1_r2_b[1])
-    d_r1_b = dot(dir_vecs_r1_r2_b[3], dir_vecs_r1_r2_b[1])
-    d_r2_ref = dot(dir_ref, dir_vecs_r1_r2_b[2])
-    d_r2_b = dot(dir_vecs_r1_r2_b[3], dir_vecs_r1_r2_b[2])
+    dir_ref = cross(E_dir_rrb[3], rd_rrb[3].S_dir)
+    d_r1_ref = dot(dir_ref, E_dir_rrb[1])
+    d_r1_b = dot(E_dir_rrb[3], E_dir_rrb[1])
+    d_r2_ref = dot(dir_ref, E_dir_rrb[2])
+    d_r2_b = dot(E_dir_rrb[3], E_dir_rrb[2])
 
     sign_r1 = (abs(d_r1_ref) > abs(d_r1_b)) ? sign(d_r1_ref) : sign(d_r1_b)
     sign_r2 = (abs(d_r2_ref) > abs(d_r2_b)) ? sign(d_r2_ref) : sign(d_r2_b)
-    return [sign_r1, sign_r2, sign_b]
+    return (sign_r1, sign_r2, sign_b)
 end
 
-function assign_e_o(
-    E_dir_r1_r2_b::AbstractVector{<:AbstractVector{<:Number}},
-    cr::NonlinearCrystal;
-    use_o_e_for_biaxial::Bool=true,
-    angle_tol=0.2u"°",
-)
-    o_or_e_r1_r2_b = [nothing, nothing, nothing]
-    if cr isa UnidirectionalCrystal
-        is_o = [isapprox(acos(clamp(abs(dot([0, 0, 1], E_dir)), 0, 1)), 90.0u"°", atol=ustrip(u"rad", angle_tol)) for E_dir in E_dir_r1_r2_b]
-        o_or_e_r1_r2_b = [i ? (:o) : (:e) for i in is_o]
-    elseif use_o_e_for_biaxial # Use old notation, where ordinary beams in `BidirectionalCrystal`s are those parallel to one of the principal axes
-        is_x_par = [isapprox(acos(clamp(abs(dot([1, 0, 0], E_dir)), 0, 1)), 0.0u"°", atol=ustrip(u"rad", angle_tol)) for E_dir in E_dir_r1_r2_b]
-        is_y_par = [isapprox(acos(clamp(abs(dot([0, 1, 0], E_dir)), 0, 1)), 0.0u"°", atol=ustrip(u"rad", angle_tol)) for E_dir in E_dir_r1_r2_b]
-        is_z_par = [isapprox(acos(clamp(abs(dot([0, 0, 1], E_dir)), 0, 1)), 0.0u"°", atol=ustrip(u"rad", angle_tol)) for E_dir in E_dir_r1_r2_b]
-        o_or_e_r1_r2_b_tmp = [(is_x_par[i] || is_y_par[i] || is_z_par[i]) ? (:o) : (:e) for i in eachindex(E_dir_r1_r2_b)]
-        if (:o) in o_or_e_r1_r2_b_tmp
-            o_or_e_r1_r2_b = o_or_e_r1_r2_b_tmp # Only set if there is at least on ordinary beam 
-        end
-    end
-    return o_or_e_r1_r2_b
-end
+# function assign_e_o(
+#     E_dir_rrb::AbstractVector{<:AbstractVector{<:Number}},
+#     cr::NonlinearCrystal;
+#     use_o_e_for_biaxial::Bool=true,
+#     angle_tol=0.2u"°",
+# )
+#     o_or_e_rrb = [nothing, nothing, nothing]
+#     if cr isa UnidirectionalCrystal
+#         is_o = [isapprox(acos(clamp(abs(dot([0, 0, 1], E_dir)), 0, 1)), 90.0u"°", atol=ustrip(u"rad", angle_tol)) for E_dir in E_dir_rrb]
+#         o_or_e_rrb = [i ? (:o) : (:e) for i in is_o]
+#     elseif use_o_e_for_biaxial # Use old notation, where ordinary beams in `BidirectionalCrystal`s are those parallel to one of the principal axes
+#         is_x_par = [isapprox(acos(clamp(abs(dot([1, 0, 0], E_dir)), 0, 1)), 0.0u"°", atol=ustrip(u"rad", angle_tol)) for E_dir in E_dir_rrb]
+#         is_y_par = [isapprox(acos(clamp(abs(dot([0, 1, 0], E_dir)), 0, 1)), 0.0u"°", atol=ustrip(u"rad", angle_tol)) for E_dir in E_dir_rrb]
+#         is_z_par = [isapprox(acos(clamp(abs(dot([0, 0, 1], E_dir)), 0, 1)), 0.0u"°", atol=ustrip(u"rad", angle_tol)) for E_dir in E_dir_rrb]
+#         o_or_e_rrb_tmp = [(is_x_par[i] || is_y_par[i] || is_z_par[i]) ? (:o) : (:e) for i in eachindex(E_dir_rrb)]
+#         if (:o) in o_or_e_rrb_tmp
+#             o_or_e_rrb = o_or_e_rrb_tmp # Only set if there is at least on ordinary beam 
+#         end
+#     end
+#     return o_or_e_rrb
+# end
 
 function Base.show(io::IO, cpm::CollinearPhaseMatch)
     digits = 3
@@ -156,63 +182,63 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
         ustrip(u"K", cpm.temp), ustrip(u"°C", cpm.temp))
 
     @printf(io, "%-22s  %10.3f pm/V\n", "d_eff:",
-        ustrip(u"pm/V", round(u"pm/V", cpm.d_eff; digits)))
+        ustrip(u"pm/V", round(u"pm/V", cpm.eff_data.d_eff; digits)))
 
     @printf(io, "%-22s  %10s W\n", "S₀ × L²:",
-        auto_fmt(ustrip(u"W", round(u"W", cpm.S_0; sigdigits=digits))))
+        auto_fmt(ustrip(u"W", round(u"W", cpm.eff_data.S0_Lsquared; sigdigits=digits))))
 
     println(io, "────────────────────────────────────────────────────────────")
     @printf(io, "%-22s  %10s  %10s  %10s\n", "Quantity (unit)", "λ_r1", "λ_r2", "λ_b")
     println(io, "────────────────────────────────────────────────────────────")
 
     # Wavelengths (nm)
-    λs = ustrip.(u"nm", round.(u"nm", cpm.lambda_r1_r2_b; digits))
+    λs = ustrip.(u"nm", round.(u"nm", cpm.lambda_rrb; digits))
     @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "Wavelength (nm):", λs...)
 
     # Polarization types
-    pols = cpm.o_or_e_r1_r2_b
-    types = cpm.hi_or_lo_r1_r2_b
-    if !all(isnothing.(pols))
+    # pols = cpm.o_or_e_rrb
+    types = cpm.hi_or_lo_rrb
+    if false # !all(isnothing.(pols))
         polar_str = ["$(types[i])/$(pols[i])" for i in 1:3]
-        @printf(io, "%-22s  %10s  %10s  %10s\n", "Type/Polarization:", polar_str...)
+        @printf(io, "%-22s  %10s  %10s  %10s\n", "Polarization:", polar_str...)
     else
-        @printf(io, "%-22s  %10s  %10s  %10s\n", "Type/Polarization:", types...)
+        @printf(io, "%-22s  %10s  %10s  %10s\n", "Polarization:", types...)
     end
 
     # Walkoff (mrad)
-    walkoffs = ustrip.(u"mrad", round.(u"mrad", cpm.walkoff_angle_r1_r2_b; digits))
+    walkoffs = ustrip.(u"mrad", round.(u"mrad", cpm.walkoff_angle_rrb; digits))
     @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "Walkoff (mrad):", walkoffs...)
 
     # Indices
-    n = round.(cpm.refractive_index_r1_r2_b; digits)
-    ng = round.(cpm.group_index_r1_r2_b; digits)
-    @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "Refractive index:", n...)
-    @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "Group index:", ng...)
+    n = round.(cpm.n_rrb; digits)
+    ng = round.(cpm.group_index_rrb; digits)
+    @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "Phase velocity / c₀:", n...)
+    @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "Group velocity / c₀::", ng...)
 
     # GDD & TOD (fs²/mm, fs³/mm)
-    gdd = ustrip.(u"fs^2/mm", round.(u"fs^2/mm", cpm.beta_2_r1_r2_b; digits))
-    tod = ustrip.(u"fs^3/mm", round.(u"fs^3/mm", cpm.beta_3_r1_r2_b; digits))
+    gdd = ustrip.(u"fs^2/mm", round.(u"fs^2/mm", cpm.beta2_rrb; digits))
+    tod = ustrip.(u"fs^3/mm", round.(u"fs^3/mm", cpm.beta3_rrb; digits))
     @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "GDD (fs²/mm):", gdd...)
     @printf(io, "%-22s  %10.3f  %10.3f  %10.3f\n", "TOD (fs³/mm):", tod...)
 
     # E_dir and D_dir
-    e_dirs = ["[" * join(round.(v; digits), ", ") * "]" for v in cpm.E_dir_r1_r2_b]
-    d_dirs = ["[" * join(round.(v; digits), ", ") * "]" for v in cpm.D_dir_r1_r2_b]
+    e_dirs = ["[" * join(round.(v; digits), ", ") * "]" for v in cpm.E_dir_rrb]
+    d_dirs = ["[" * join(round.(v; digits), ", ") * "]" for v in cpm.D_dir_rrb]
     @printf(io, "%-22s  %10s  %10s  %10s\n", "E_dir:", e_dirs...)
     @printf(io, "%-22s  %10s  %10s  %10s\n", "D_dir:", d_dirs...)
 
     # Bandwidths
-    bw = auto_fmt.(ustrip.(u"GHz*cm", round.(u"GHz*cm", cpm.lambda_L_bw; digits)))
+    bw = auto_fmt.(ustrip.(u"GHz*cm", round.(u"GHz*cm", cpm.bw_data.lambda_L_bw; digits)))
     @printf(io, "%-22s  %10s  %10s  %10s\n", "ω BW × L (GHz·cm):", bw...)
 
     @printf(io, "%-22s  %10s\n", "T BW × L (K·cm):",
-        auto_fmt(ustrip(u"K*cm", round(u"K*cm", cpm.temp_L_bw; digits))))
+        auto_fmt(ustrip(u"K*cm", round(u"K*cm", cpm.bw_data.temp_L_bw; digits))))
 
     @printf(io, "%-22s  %10s\n", "θ BW × L (mrad·cm):",
-        auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", cpm.theta_L_bw; digits))))
+        auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", cpm.bw_data.theta_L_bw; digits))))
 
     @printf(io, "%-22s  %10s\n", "ϕ BW × L (mrad·cm):",
-        auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", cpm.phi_L_bw; digits))))
+        auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", cpm.bw_data.phi_L_bw; digits))))
 
     println(io, "────────────────────────────────────────────────────────────")
 end
@@ -244,18 +270,18 @@ end
 
 function delta_k(
     θ_pm::Angle,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     cr::UnidirectionalCrystal;
     kwargs...
 )
     # Use symmetry in unidirectional crystals
-    return delta_k(θ_pm, 0.0u"°", hi_or_lo_r1_r2_b, cr; kwargs...)
+    return delta_k(θ_pm, 0.0u"°", hi_or_lo_rrb, cr; kwargs...)
 end
 
 function delta_k(
-    θ_pm::Angle,
-    ϕ_pm::Angle,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    theta_pm::Angle,
+    phi_pm::Angle,
+    hi_or_lo_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_r1::Union{Nothing,Length}=nothing,
     lambda_r2::Union{Nothing,Length}=nothing,
@@ -263,11 +289,11 @@ function delta_k(
     temp::Temperature=default_temp(cr)
 )
     lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
-    @assert all([p in [:hi, :lo] for p in hi_or_lo_r1_r2_b])
+    @assert all([p in [:hi, :lo] for p in hi_or_lo_rrb])
 
-    n_r1 = refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_r1, temp; n_hi_lo_only=true)[hi_or_lo_r1_r2_b[1] == :hi ? 1 : 2]
-    n_r2 = refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_r2, temp; n_hi_lo_only=true)[hi_or_lo_r1_r2_b[2] == :hi ? 1 : 2]
-    n_b = refraction_data_hi_lo(θ_pm, ϕ_pm, cr, lambda_b, temp; n_hi_lo_only=true)[hi_or_lo_r1_r2_b[3] == :hi ? 1 : 2]
+    n_r1 = calc_n_hi_lo(theta_pm, phi_pm, cr, lambda_r1; temp)[hi_or_lo_rrb[1]===:hi ? 1 : 2]
+    n_r2 = calc_n_hi_lo(theta_pm, phi_pm, cr, lambda_r2; temp)[hi_or_lo_rrb[2]===:hi ? 1 : 2]
+    n_b = calc_n_hi_lo(theta_pm, phi_pm, cr, lambda_b; temp)[hi_or_lo_rrb[3]===:hi ? 1 : 2]
 
     return 2π * (n_r1 / lambda_r1 + n_r2 / lambda_r2 - n_b / lambda_b)
 end
@@ -275,7 +301,7 @@ end
 function delta_k_with_shifting(
     θ_pm::Angle,
     ϕ_pm::Angle,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_r1::Union{Nothing,Length}=nothing,
     lambda_r2::Union{Nothing,Length}=nothing,
@@ -289,7 +315,7 @@ function delta_k_with_shifting(
     delta_omega_b::Frequency=0.0u"GHz",
 )
     lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
-    @assert all([p in [:hi, :lo] for p in hi_or_lo_r1_r2_b])
+    @assert all([p in [:hi, :lo] for p in hi_or_lo_rrb])
 
     @assert delta_omega_r1 + delta_omega_r2 == delta_omega_b "Phasematching is only fulfilled for Δω_r1 + Δω_r2 = Δω_b"
     lambda_r1_shifted = shift_lambda_with_freq(lambda_r1, delta_omega_r1)
@@ -299,7 +325,7 @@ function delta_k_with_shifting(
     delta_k(
         (θ_pm + delta_theta) |> u"rad",
         (ϕ_pm + delta_phi) |> u"rad",
-        hi_or_lo_r1_r2_b,
+        hi_or_lo_rrb,
         cr;
         lambda_r1=lambda_r1_shifted,
         lambda_r2=lambda_r2_shifted,
@@ -311,7 +337,7 @@ end
 function calc_delta_k_map(
     theta::Angle,
     phi::Angle,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_b_min::Union{Nothing,Length}=nothing,
     lambda_b_max::Union{Nothing,Length}=nothing,
@@ -334,7 +360,7 @@ function calc_delta_k_map(
         lambda_r12 = range_lambda_r12[i_r12]
         lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_b, lambda_r1=lambda_r12)
         if all(is_lambda_valid.([lambda_r1, lambda_r2, lambda_b], cr))
-            all_delta_k[i_b, i_r12] = delta_k(theta, phi, hi_or_lo_r1_r2_b, cr; temp, lambda_r1, lambda_r2, lambda_b)
+            all_delta_k[i_b, i_r12] = delta_k(theta, phi, hi_or_lo_rrb, cr; temp, lambda_r1, lambda_r2, lambda_b)
         else
             all_delta_k[i_b, i_r12] = NaN * u"m^-1"
         end
@@ -342,15 +368,15 @@ function calc_delta_k_map(
     return range_lambda_r12, range_lambda_b, all_delta_k
 end
 
-function lambda_L_bandwidths(group_index_r1_r2_b::AbstractVector{<:Real})
+function lambda_L_bandwidths(refr_data::PMRefractionData)
     # ∂Δk/∂f_r2 = ∂k_r2/∂f_r2 - ∂k_b/∂f_b for f_r1=const.
-    ddelta_k_df_r2_neg_b = 2π / c_0 * (group_index_r1_r2_b[2] - group_index_r1_r2_b[3])
+    ddelta_k_df_r2_neg_b = 2π / c_0 * (refr_data.group_index_rrb[2] - refr_data.group_index_rrb[3])
 
     # ∂Δk/∂f_r1 = ∂k_r1/∂f_r1 - ∂k_b/∂f_b for f_r2=const.
-    ddelta_k_df_r1_neg_b = 2π / c_0 * (group_index_r1_r2_b[1] - group_index_r1_r2_b[3])
+    ddelta_k_df_r1_neg_b = 2π / c_0 * (refr_data.group_index_rrb[1] - refr_data.group_index_rrb[3])
 
     # ∂Δk/∂f_r1 = ∂k_r1/∂f_r1 - ∂k_r2/∂f_r2 for f_b=const.
-    ddelta_k_df_r1_neg_r2 = 2π / c_0 * (group_index_r1_r2_b[1] - group_index_r1_r2_b[2])
+    ddelta_k_df_r1_neg_r2 = 2π / c_0 * (refr_data.group_index_rrb[1] - refr_data.group_index_rrb[2])
 
     # Δf_k_bw  * L = 2π / |∂k_i/∂f_i - ∂k_j/∂f_j| = 2π / |1 / v_g_i - 1 / v_g_j|
     return (
@@ -360,28 +386,18 @@ function lambda_L_bandwidths(group_index_r1_r2_b::AbstractVector{<:Real})
     )
 end
 
-
-function temperature_L_bandwidth(
-    θ_pm::Angle,
-    ϕ_pm::Angle,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
-    cr::NonlinearCrystal;
-    lambda_r1::Union{Nothing,Length}=nothing,
-    lambda_r2::Union{Nothing,Length}=nothing,
-    lambda_b::Union{Nothing,Length}=nothing,
-    temp::Temperature=default_temp(cr)
-)
+function temperature_L_bandwidth(pm_data::PMCollinearData)
     fun = ΔT -> ustrip(
         u"m^-1",
         delta_k_with_shifting(
-            θ_pm,
-            ϕ_pm,
-            hi_or_lo_r1_r2_b,
-            cr;
-            lambda_r1,
-            lambda_r2,
-            lambda_b,
-            temp,
+            pm_data.theta_pm,
+            pm_data.phi_pm,
+            pm_data.hi_or_lo_rrb,
+            pm_data.cr;
+            lambda_r1=pm_data.lambda_rrb[1],
+            lambda_r2=pm_data.lambda_rrb[2],
+            lambda_b=pm_data.lambda_rrb[3],
+            pm_data.temp,
             delta_temp=ΔT * u"K",
         )
     )
@@ -394,27 +410,18 @@ function temperature_L_bandwidth(
     return 2π / abs(ddeltak_dT)
 end
 
-function theta_L_bandwidth(
-    θ_pm::Angle,
-    ϕ_pm::Angle,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
-    cr::NonlinearCrystal;
-    lambda_r1::Union{Nothing,Length}=nothing,
-    lambda_r2::Union{Nothing,Length}=nothing,
-    lambda_b::Union{Nothing,Length}=nothing,
-    temp::Temperature=default_temp(cr)
-)
+function theta_L_bandwidth(pm_data::PMCollinearData)
     fun = Δθ -> ustrip(
         u"m^-1",
         delta_k_with_shifting(
-            θ_pm,
-            ϕ_pm,
-            hi_or_lo_r1_r2_b,
-            cr;
-            lambda_r1,
-            lambda_r2,
-            lambda_b,
-            temp,
+            pm_data.theta_pm,
+            pm_data.phi_pm,
+            pm_data.hi_or_lo_rrb,
+            pm_data.cr;
+            lambda_r1=pm_data.lambda_rrb[1],
+            lambda_r2=pm_data.lambda_rrb[2],
+            lambda_b=pm_data.lambda_rrb[3],
+            pm_data.temp,
             delta_theta=Δθ * u"rad",
         )
     )
@@ -427,27 +434,18 @@ function theta_L_bandwidth(
     return 2π / abs(ddeltak_dtheta)
 end
 
-function phi_L_bandwidth(
-    θ_pm::Angle,
-    ϕ_pm::Angle,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
-    cr::NonlinearCrystal;
-    lambda_r1::Union{Nothing,Length}=nothing,
-    lambda_r2::Union{Nothing,Length}=nothing,
-    lambda_b::Union{Nothing,Length}=nothing,
-    temp::Temperature=default_temp(cr)
-)
+function phi_L_bandwidth(pm_data::PMCollinearData)
     fun = Δϕ -> ustrip(
         u"m^-1",
         delta_k_with_shifting(
-            θ_pm,
-            ϕ_pm,
-            hi_or_lo_r1_r2_b,
-            cr;
-            lambda_r1,
-            lambda_r2,
-            lambda_b,
-            temp,
+            pm_data.theta_pm,
+            pm_data.phi_pm,
+            pm_data.hi_or_lo_rrb,
+            pm_data.cr;
+            lambda_r1=pm_data.lambda_rrb[1],
+            lambda_r2=pm_data.lambda_rrb[2],
+            lambda_b=pm_data.lambda_rrb[3],
+            pm_data.temp,
             delta_phi=Δϕ * u"rad",
         )
     )
@@ -464,7 +462,7 @@ end
 function find_nearest_pm_along_theta_phi(
     theta_target::Angle,
     phi_target::Angle,
-    pol_r1_r2_b::AbstractVector{Symbol},
+    pol_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_r1::Union{Nothing,Length}=nothing,
     lambda_r2::Union{Nothing,Length}=nothing,
@@ -473,8 +471,8 @@ function find_nearest_pm_along_theta_phi(
     ngrid=500,
     tol=1e-14u"nm^-1",
 )
-    all_pm_θ_fixed = find_all_pms_along_dimension(pol_r1_r2_b, cr; lambda_r1_fixed=lambda_r1, lambda_r2_fixed=lambda_r2, lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, ngrid, tol, theta_fixed=theta_target)
-    all_pm_ϕ_fixed = find_all_pms_along_dimension(pol_r1_r2_b, cr; lambda_r1_fixed=lambda_r1, lambda_r2_fixed=lambda_r2, lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, ngrid, tol, phi_fixed=phi_target)
+    all_pm_θ_fixed = find_all_pms_along_dimension(pol_rrb, cr; lambda_r1_fixed=lambda_r1, lambda_r2_fixed=lambda_r2, lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, ngrid, tol, theta_fixed=theta_target)
+    all_pm_ϕ_fixed = find_all_pms_along_dimension(pol_rrb, cr; lambda_r1_fixed=lambda_r1, lambda_r2_fixed=lambda_r2, lambda_b_fixed=lambda_b, temp_min=temp, temp_max=temp, ngrid, tol, phi_fixed=phi_target)
 
     all_pm_candidates = [[pm for pm in all_pm_θ_fixed]; [pm for pm in all_pm_ϕ_fixed]]
     isempty(all_pm_candidates) && return nothing
@@ -490,7 +488,7 @@ function find_nearest_pm_along_theta_phi(
 end
 
 function find_nearest_pm_along_lambda_r_b(
-    pol_r1_r2_b::AbstractVector{Symbol},
+    pol_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_r1::Union{Nothing,Length}=nothing,
     lambda_r2::Union{Nothing,Length}=nothing,
@@ -503,23 +501,25 @@ function find_nearest_pm_along_lambda_r_b(
     @assert count(isnothing.([lambda_r1, lambda_r2])) == 1 "Either lambda_r1 or lambda_r2 must be given and the other one must be nothing."
 
     # Search along lambda_b
-    all_pm_lambda_b = find_all_pms_along_dimension(pol_r1_r2_b, cr;
+    all_pm_lambda_b = find_all_pms_along_dimension(pol_rrb, cr;
         lambda_b_fixed=lambda_b,
         temp_min=temp,
         temp_max=temp,
         principal_axis,
         ngrid=ngrid,
-        tol=tol)
+        tol=tol
+    )
 
     # Search along lambda_r1 or lambda_r2
-    all_pm_lambda_r = find_all_pms_along_dimension(pol_r1_r2_b, cr;
+    all_pm_lambda_r = find_all_pms_along_dimension(pol_rrb, cr;
         lambda_r1_fixed=lambda_r1,
         lambda_r2_fixed=lambda_r2,
         temp_min=temp,
         temp_max=temp,
         principal_axis,
         ngrid=ngrid,
-        tol=tol)
+        tol=tol
+    )
 
     # Combine candidates
     all_pm_candidates = vcat(all_pm_lambda_b, all_pm_lambda_r)
@@ -527,7 +527,7 @@ function find_nearest_pm_along_lambda_r_b(
 
     # Compute distance to target wavelength(s)
     distances = map(all_pm_candidates) do pm
-        λs = pm.lambda_r1_r2_b
+        λs = pm.lambda_rrb
         λ_r = isnothing(lambda_r1) ? λs[2] : λs[1]  # whichever was scanned
         λ_b = λs[3]
         Δλ_r = abs(λ_r - (lambda_r1 === nothing ? lambda_r2 : lambda_r1))
@@ -540,7 +540,7 @@ function find_nearest_pm_along_lambda_r_b(
 end
 
 function find_all_pms_along_dimension(
-    pol_r1_r2_b::AbstractVector{Symbol},
+    pol_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_r1_fixed::Union{Nothing,Length}=nothing,
     lambda_r2_fixed::Union{Nothing,Length}=nothing,
@@ -559,13 +559,13 @@ function find_all_pms_along_dimension(
     if !isnothing(theta_fixed) || !isnothing(phi_fixed)
         @assert isnothing(principal_axis) "principal_axis must be `nothing` if searching along fixed θ or ϕ directions."
         @assert !isnothing(temp_fixed) "Fix temperature by selecting temp_min = temp_max if searching along fixed θ or ϕ directions."
-        return _pms_vs_angle(pol_r1_r2_b, cr; lambda_r1=lambda_r1_fixed, lambda_r2=lambda_r2_fixed, lambda_b=lambda_b_fixed, temp=temp_fixed, theta_fixed, phi_fixed, ngrid, tol)
+        return _pms_vs_angle(pol_rrb, cr; lambda_r1=lambda_r1_fixed, lambda_r2=lambda_r2_fixed, lambda_b=lambda_b_fixed, temp=temp_fixed, theta_fixed, phi_fixed, ngrid, tol)
     end
 
     red_fixed_count = count(.!isnothing.([lambda_r1_fixed, lambda_r2_fixed]))
     @assert (count(.!isnothing.([temp_fixed, lambda_b_fixed])) + red_fixed_count) == 2 "You must provide exactly two of those: (temp_min == temp_max), lambda_b_fixed, lambda_r1_fixed, and lambda_r2_fixed."
 
-    hi_or_lo_r1_r2_b = pol_r1_r2_b # TODO: Enable searching along temperature and wavelengths with :o/:e notation
+    hi_or_lo_rrb = pol_rrb # TODO: Enable searching along temperature and wavelengths with :o/:e notation
 
     if isnothing(principal_axis) && isnothing(theta_fixed) && isnothing(phi_fixed)
         principal_axis = [:X, :Y, :Z]
@@ -573,46 +573,46 @@ function find_all_pms_along_dimension(
     θ_ϕ_principal_axes = axes_to_θ_ϕ(principal_axis)
 
     if isnothing(temp_fixed)
-        return _pms_vs_temperature(θ_ϕ_principal_axes, hi_or_lo_r1_r2_b, cr, lambda_r1_fixed, lambda_r2_fixed, lambda_b_fixed, temp_min, temp_max, ngrid, tol)
+        return _pms_vs_temperature(θ_ϕ_principal_axes, hi_or_lo_rrb, cr, lambda_r1_fixed, lambda_r2_fixed, lambda_b_fixed, temp_min, temp_max, ngrid, tol)
     elseif isnothing(lambda_b_fixed)
-        return _pms_vs_lambda_b(θ_ϕ_principal_axes, hi_or_lo_r1_r2_b, cr, lambda_r1_fixed, lambda_r2_fixed, temp_fixed, λmin, λmax, ngrid, tol)
+        return _pms_vs_lambda_b(θ_ϕ_principal_axes, hi_or_lo_rrb, cr, lambda_r1_fixed, lambda_r2_fixed, temp_fixed, λmin, λmax, ngrid, tol)
     elseif isnothing(lambda_r1_fixed) && isnothing(lambda_r2_fixed)
-        return _pms_vs_lambda_r1(θ_ϕ_principal_axes, hi_or_lo_r1_r2_b, cr, lambda_b_fixed, temp_fixed, λmin, λmax, ngrid, tol)
+        return _pms_vs_lambda_r1(θ_ϕ_principal_axes, hi_or_lo_rrb, cr, lambda_b_fixed, temp_fixed, λmin, λmax, ngrid, tol)
     else
         error("This should never be reached.")
     end
 end
 
-function _pms_vs_angle(pol_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp, theta_fixed, phi_fixed, ngrid, tol)
+function _pms_vs_angle(pol_rrb, cr; lambda_r1, lambda_r2, lambda_b, temp, theta_fixed, phi_fixed, ngrid, tol)
     lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
-    lambda_r1_r2_b = [lambda_r1, lambda_r2, lambda_b]
+    lambda_rrb = (lambda_r1, lambda_r2, lambda_b)
 
     # Transform :o/e into :hi/:lo if possible
-    hi_or_lo_r1_r2_b = polarization_r1_r2_b_to_hi_lo(pol_r1_r2_b, cr, lambda_r1_r2_b; temp)
+    hi_or_lo_rrb = polarization_rrb_to_hi_lo(pol_rrb, cr, lambda_rrb; temp)
 
     pms = CollinearPhaseMatch[]
 
     if !isnothing(theta_fixed) && isnothing(phi_fixed)
         all_ϕ = range(0, 2π, length=ngrid) * u"rad"
-        all_delta_k = [delta_k(theta_fixed, ϕ, hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp) for ϕ in all_ϕ]
+        all_delta_k = [delta_k(theta_fixed, ϕ, hi_or_lo_rrb, cr; lambda_r1, lambda_r2, lambda_b, temp) for ϕ in all_ϕ]
 
         for i in 1:(length(all_ϕ)-1)
             if ustrip(all_delta_k[i] * all_delta_k[i+1]) < 0
-                ϕ_sol = find_zero(ϕ -> delta_k(theta_fixed, ϕ, hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp),
+                ϕ_sol = find_zero(ϕ -> delta_k(theta_fixed, ϕ, hi_or_lo_rrb, cr; lambda_r1, lambda_r2, lambda_b, temp),
                     (all_ϕ[i], all_ϕ[i+1]), Bisection(), atol=tol)
-                push!(pms, CollinearPhaseMatch(cr, lambda_r1_r2_b, temp, hi_or_lo_r1_r2_b, theta_fixed, ϕ_sol))
+                push!(pms, CollinearPhaseMatch(cr, lambda_rrb, temp, hi_or_lo_rrb, theta_fixed, ϕ_sol))
             end
         end
 
     elseif isnothing(theta_fixed) && !isnothing(phi_fixed)
         all_θ = range(0, π, length=ngrid) * u"rad"
-        all_delta_k = [delta_k(θ, phi_fixed, hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp) for θ in all_θ]
+        all_delta_k = [delta_k(θ, phi_fixed, hi_or_lo_rrb, cr; lambda_r1, lambda_r2, lambda_b, temp) for θ in all_θ]
 
         for i in 1:(length(all_θ)-1)
             if ustrip(all_delta_k[i] * all_delta_k[i+1]) < 0
-                θ_sol = find_zero(θ -> delta_k(θ, phi_fixed, hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp),
+                θ_sol = find_zero(θ -> delta_k(θ, phi_fixed, hi_or_lo_rrb, cr; lambda_r1, lambda_r2, lambda_b, temp),
                     (all_θ[i], all_θ[i+1]), Bisection(), atol=tol)
-                push!(pms, CollinearPhaseMatch(cr, lambda_r1_r2_b, temp, hi_or_lo_r1_r2_b, θ_sol, phi_fixed))
+                push!(pms, CollinearPhaseMatch(cr, lambda_rrb, temp, hi_or_lo_rrb, θ_sol, phi_fixed))
             end
         end
     else
@@ -622,19 +622,19 @@ function _pms_vs_angle(pol_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp, th
     return pms
 end
 
-function _pms_vs_temperature(θ_ϕs, hi_or_lo_r1_r2_b, cr, λr1_fix, λr2_fix, λb_fix, temp_min, temp_max, ngrid, tol)
+function _pms_vs_temperature(θ_ϕs, hi_or_lo_rrb, cr, λr1_fix, λr2_fix, λb_fix, temp_min, temp_max, ngrid, tol)
     pms = CollinearPhaseMatch[]
     λr1, λr2, λb = pm_wavelengths(; lambda_r1=λr1_fix, lambda_r2=λr2_fix, lambda_b=λb_fix)
 
     for θ_ϕ in θ_ϕs
         temps = range(temp_min, temp_max, length=ngrid)
-        Δk = [delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; temp=T, lambda_r1=λr1, lambda_r2=λr2, lambda_b=λb) for T in temps]
+        Δk = [delta_k(θ_ϕ..., hi_or_lo_rrb, cr; temp=T, lambda_r1=λr1, lambda_r2=λr2, lambda_b=λb) for T in temps]
 
         for i in 1:length(temps)-1
             if ustrip(Δk[i] * Δk[i+1]) < 0
-                fun = T -> delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; temp=T, lambda_r1=λr1, lambda_r2=λr2, lambda_b=λb)
+                fun = T -> delta_k(θ_ϕ..., hi_or_lo_rrb, cr; temp=T, lambda_r1=λr1, lambda_r2=λr2, lambda_b=λb)
                 T_sol = find_zero(fun, (temps[i], temps[i+1]), Bisection(), atol=tol)
-                push!(pms, CollinearPhaseMatch(cr, [λr1, λr2, λb], T_sol, hi_or_lo_r1_r2_b, θ_ϕ...))
+                push!(pms, CollinearPhaseMatch(cr, (λr1, λr2, λb), T_sol, hi_or_lo_rrb, θ_ϕ...))
             end
         end
     end
@@ -642,7 +642,7 @@ function _pms_vs_temperature(θ_ϕs, hi_or_lo_r1_r2_b, cr, λr1_fix, λr2_fix, �
     return pms
 end
 
-function _pms_vs_lambda_b(θ_ϕs, hi_or_lo_r1_r2_b, cr, λr1_fix, λr2_fix, temp, λmin, λmax, ngrid, tol)
+function _pms_vs_lambda_b(θ_ϕs, hi_or_lo_rrb, cr, λr1_fix, λr2_fix, temp, λmin, λmax, ngrid, tol)
     pms = CollinearPhaseMatch[]
 
     for θ_ϕ in θ_ϕs
@@ -655,7 +655,7 @@ function _pms_vs_lambda_b(θ_ϕs, hi_or_lo_r1_r2_b, cr, λr1_fix, λr2_fix, temp
                     1 / (1 / λr1_fix + 1 / λmax),
                     length=ngrid
                 )
-                Δk = [delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=λr1_fix, lambda_b=λb, temp=temp) for λb in λb_range]
+                Δk = [delta_k(θ_ϕ..., hi_or_lo_rrb, cr; lambda_r1=λr1_fix, lambda_b=λb, temp=temp) for λb in λb_range]
             end
         else # !isnothing(λr2_fix)
             if 1 / (1 / λr2_fix + 1 / λmax) < λmin
@@ -666,22 +666,22 @@ function _pms_vs_lambda_b(θ_ϕs, hi_or_lo_r1_r2_b, cr, λr1_fix, λr2_fix, temp
                     1 / (1 / λr2_fix + 1 / λmax),
                     length=ngrid
                 )
-                Δk = [delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r2=λr2_fix, lambda_b=λb, temp=temp) for λb in λb_range]
+                Δk = [delta_k(θ_ϕ..., hi_or_lo_rrb, cr; lambda_r2=λr2_fix, lambda_b=λb, temp=temp) for λb in λb_range]
             end
         end
 
         for i in 1:length(λb_range)-1
             if ustrip(Δk[i] * Δk[i+1]) < 0
                 if !isnothing(λr1_fix)
-                    fun = λb -> delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=λr1_fix, lambda_b=λb, temp=temp)
+                    fun = λb -> delta_k(θ_ϕ..., hi_or_lo_rrb, cr; lambda_r1=λr1_fix, lambda_b=λb, temp=temp)
                     λb_sol = find_zero(fun, (λb_range[i], λb_range[i+1]), Bisection(), atol=tol)
                     λr2_sol = 1 / (1 / λb_sol - 1 / λr1_fix)
-                    push!(pms, CollinearPhaseMatch(cr, [λr1_fix, λr2_sol, λb_sol], temp, hi_or_lo_r1_r2_b, θ_ϕ...))
+                    push!(pms, CollinearPhaseMatch(cr, (λr1_fix, λr2_sol, λb_sol), temp, hi_or_lo_rrb, θ_ϕ...))
                 else
-                    fun = λb -> delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r2=λr2_fix, lambda_b=λb, temp=temp)
+                    fun = λb -> delta_k(θ_ϕ..., hi_or_lo_rrb, cr; lambda_r2=λr2_fix, lambda_b=λb, temp=temp)
                     λb_sol = find_zero(fun, (λb_range[i], λb_range[i+1]), Bisection(), atol=tol)
                     λr1_sol = 1 / (1 / λb_sol - 1 / λr2_fix)
-                    push!(pms, CollinearPhaseMatch(cr, [λr1_sol, λr2_fix, λb_sol], temp, hi_or_lo_r1_r2_b, θ_ϕ...))
+                    push!(pms, CollinearPhaseMatch(cr, (λr1_sol, λr2_fix, λb_sol), temp, hi_or_lo_rrb, θ_ϕ...))
                 end
             end
         end
@@ -690,7 +690,7 @@ function _pms_vs_lambda_b(θ_ϕs, hi_or_lo_r1_r2_b, cr, λr1_fix, λr2_fix, temp
     return pms
 end
 
-function _pms_vs_lambda_r1(θ_ϕs, hi_or_lo_r1_r2_b, cr, λb, temp, λmin, λmax, ngrid, tol)
+function _pms_vs_lambda_r1(θ_ϕs, hi_or_lo_rrb, cr, λb, temp, λmin, λmax, ngrid, tol)
     pms = CollinearPhaseMatch[]
 
     for θ_ϕ in θ_ϕs
@@ -705,17 +705,17 @@ function _pms_vs_lambda_r1(θ_ϕs, hi_or_lo_r1_r2_b, cr, λb, temp, λmin, λmax
                 λmax,
                 length=ngrid
             )
-            Δk = [delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=λr1, lambda_b=λb, temp=temp) for λr1 in λr1_range]
+            Δk = [delta_k(θ_ϕ..., hi_or_lo_rrb, cr; lambda_r1=λr1, lambda_b=λb, temp=temp) for λr1 in λr1_range]
         end
 
         for i in 1:length(λr1_range)-1
             if ustrip(Δk[i] * Δk[i+1]) < 0
-                fun = λr1 -> delta_k(θ_ϕ..., hi_or_lo_r1_r2_b, cr; lambda_r1=λr1, lambda_b=λb, temp=temp)
+                fun = λr1 -> delta_k(θ_ϕ..., hi_or_lo_rrb, cr; lambda_r1=λr1, lambda_b=λb, temp=temp)
                 λr1_sol = find_zero(fun, (λr1_range[i], λr1_range[i+1]), Bisection(), atol=tol)
                 λr2_sol = 1 / (1 / λb - 1 / λr1_sol)
 
-                all_λ_sol = λr1_sol < λr2_sol ? [λr2_sol, λr1_sol, λb] : [λr1_sol, λr2_sol, λb] # Sort red lambdas, so that λ_r1 is the larger one
-                push!(pms, CollinearPhaseMatch(cr, all_λ_sol, temp, hi_or_lo_r1_r2_b, θ_ϕ...))
+                all_λ_sol = λr1_sol < λr2_sol ? (λr2_sol, λr1_sol, λb) : (λr1_sol, λr2_sol, λb) # Sort red lambdas, so that λ_r1 is the larger one
+                push!(pms, CollinearPhaseMatch(cr, all_λ_sol, temp, hi_or_lo_rrb, θ_ϕ...))
             end
         end
     end

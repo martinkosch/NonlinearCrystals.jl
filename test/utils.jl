@@ -34,10 +34,10 @@ end
 
 perms = NonlinearCrystals.bool_permutations(:A, :B, 2)
 expected = [
-    [:A, :A],
-    [:B, :A],
-    [:A, :B],
-    [:B, :B]
+    (:A, :A),
+    (:B, :A),
+    (:A, :B),
+    (:B, :B)
 ]
 @test length(perms) == 4
 @test all(p -> p in expected, perms)

@@ -1,4 +1,4 @@
-export NonlinearCrystal, UnidirectionalCrystal, BidirectionalCrystal, default_lambda, default_temp, is_lambda_valid, valid_lambda_range, calc_d_XYZ_full, optical_axis_angle, refraction_data_hi_lo, plot_birefringent_refraction, default_temp
+export NonlinearCrystal, UnidirectionalCrystal, BidirectionalCrystal, default_lambda, default_temp, is_lambda_valid, valid_lambda_range, calc_d_XYZ_full, optical_axis_angle, RefractionDataHiLo, RefractionData, plot_birefringent_refraction, default_temp
 
 abstract type NonlinearCrystal end
 
@@ -145,28 +145,28 @@ function calc_d_eff(
     E_dir_r1::AbstractVector{<:Number},
     E_dir_r2::AbstractVector{<:Number},
     E_dir_b::AbstractVector{<:Number};
-    lambda_r1_r2_b::Union{AbstractVector{<:Length},Nothing}=nothing,
+    lambda_rrb::Union{AbstractVector{<:Length},Nothing}=nothing,
     temp::Temperature=default_temp(cr),
-)   
+)
     # If all lambdas are given, use Miller scaling
-    # if isnothing(lambda_r1_r2_b)
-        @tullio d_eff := E_dir_b[i] * cr.d_XYZ_ref_full[i, j, k] * E_dir_r1[j] * E_dir_r2[k]
+    # if isnothing(lambda_rrb)
+    @tullio d_eff := E_dir_b[i] * cr.d_XYZ_ref_full[i, j, k] * E_dir_r1[j] * E_dir_r2[k]
     # else
     #     # Compute refractive indices along XYZ at given wavelengths and temperature
     #     n_r1 = @SVector [
-    #         cr.n_X_principal(lambda_r1_r2_b[1], temp),
-    #         cr.n_Y_principal(lambda_r1_r2_b[1], temp),
-    #         cr.n_Z_principal(lambda_r1_r2_b[1], temp)
+    #         cr.n_X_principal(lambda_rrb[1], temp),
+    #         cr.n_Y_principal(lambda_rrb[1], temp),
+    #         cr.n_Z_principal(lambda_rrb[1], temp)
     #     ]
     #     n_r2 = @SVector [
-    #         cr.n_X_principal(lambda_r1_r2_b[2], temp),
-    #         cr.n_Y_principal(lambda_r1_r2_b[2], temp),
-    #         cr.n_Z_principal(lambda_r1_r2_b[2], temp)
+    #         cr.n_X_principal(lambda_rrb[2], temp),
+    #         cr.n_Y_principal(lambda_rrb[2], temp),
+    #         cr.n_Z_principal(lambda_rrb[2], temp)
     #     ]
     #     n_b = @SVector [
-    #         cr.n_X_principal(lambda_r1_r2_b[3], temp),
-    #         cr.n_Y_principal(lambda_r1_r2_b[3], temp),
-    #         cr.n_Z_principal(lambda_r1_r2_b[3], temp)
+    #         cr.n_X_principal(lambda_rrb[3], temp),
+    #         cr.n_Y_principal(lambda_rrb[3], temp),
+    #         cr.n_Z_principal(lambda_rrb[3], temp)
     #     ]
 
     #     # Use Miller-scaled d_XYZ tensor to calculate d_eff
@@ -210,7 +210,7 @@ struct UnidirectionalCrystal{TM,TE,TO,TD} <: NonlinearCrystal
         n_o_principal::RefractiveIndex,
         n_e_principal::RefractiveIndex,
         d_XYZ_ref_full::AbstractArray{<:Number,3};
-    )   
+    )
         @assert haskey(metadata, :point_group) && haskey(POINT_GROUP_MAP, metadata[:point_group]) "Point group unknown or not specified in metadata. Possible values are:\n$(keys(NonlinearCrystals.POINT_GROUP_MAP))"
         return new{typeof(metadata),typeof(n_o_principal),typeof(n_e_principal),eltype(d_XYZ_ref_full)}(
             metadata, n_o_principal, n_e_principal, SArray{Tuple{3,3,3},eltype(d_XYZ_ref_full)}(d_XYZ_ref_full)
@@ -279,12 +279,12 @@ function o_e_to_hi_lo(
 end
 
 function o_e_to_hi_lo(
-    o_or_e_r1_r2_b::AbstractVector{Symbol},
+    o_or_e_rrb::NTuple{3,Symbol},
     cr::UnidirectionalCrystal,
-    lambda_r1_r2_b::AbstractVector{<:Unitful.Length};
+    lambda_rrb::NTuple{3,Length};
     temp::Temperature=default_temp(cr),
 )
-    return [o_e_to_hi_lo(o_or_e_r1_r2_b[i], cr, lambda_r1_r2_b[i]; temp) for i in eachindex(o_or_e_r1_r2_b)]
+    return Tuple(o_e_to_hi_lo(o_or_e_rrb[i], cr, lambda_rrb[i]; temp) for i in eachindex(o_or_e_rrb))
 end
 
 function hi_lo_to_o_e(
@@ -302,30 +302,30 @@ function hi_lo_to_o_e(
 end
 
 function hi_lo_to_o_e(
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     cr::UnidirectionalCrystal,
-    lambda_r1_r2_b::AbstractVector{<:Unitful.Length};
+    lambda_rrb::NTuple{3,Length};
     temp::Temperature=default_temp(cr),
 )
-    return [hi_lo_to_o_e(hi_or_lo_r1_r2_b[i], cr, lambda_r1_r2_b[i]; temp) for i in eachindex(hi_or_lo_r1_r2_b)]
+    return Tuple(hi_lo_to_o_e(hi_or_lo_rrb[i], cr, lambda_rrb[i]; temp) for i in eachindex(hi_or_lo_rrb))
 end
 
-function polarization_r1_r2_b_to_hi_lo(
-    pol_r1_r2_b::AbstractVector{Symbol},
+function polarization_rrb_to_hi_lo(
+    pol_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal,
-    lambda_r1_r2_b::AbstractVector{<:Unitful.Length};
+    lambda_rrb::NTuple{3,Length};
     temp::Temperature=default_temp(cr),
 )
-    if all([p in [:hi, :lo] for p in pol_r1_r2_b])
-        return pol_r1_r2_b
+    if all([p in [:hi, :lo] for p in pol_rrb])
+        return pol_rrb
     elseif isa(cr, UnidirectionalCrystal)
-        if all([p in [:o, :e] for p in pol_r1_r2_b])
-            return o_e_to_hi_lo(pol_r1_r2_b, cr, lambda_r1_r2_b; temp)
+        if all([p in [:o, :e] for p in pol_rrb])
+            return o_e_to_hi_lo(pol_rrb, cr, lambda_rrb; temp)
         else
-            @error "$(pol_r1_r2_b) is unvalid polarization data."
+            @error "$(pol_rrb) is unvalid polarization data."
         end
     else
-        @error "$(pol_r1_r2_b) is unvalid polarization data for a crystal of type $(typeof(cr))."
+        @error "$(pol_rrb) is unvalid polarization data for a crystal of type $(typeof(cr))."
     end
 end
 
@@ -360,21 +360,78 @@ function optical_axis_angle(
     return 0.0u"rad"
 end
 
-function refraction_data_hi_lo(
+struct RefractionDataHiLo{CT<:NonlinearCrystal}
+    theta::typeof(1.0u"rad")
+    phi::typeof(1.0u"rad")
+    cr::CT
+    lambda::typeof(1.0u"m")
+    temp::typeof(1.0u"K")
+    n_hi_lo::NTuple{2,Float64}
+    group_index_hi_lo::NTuple{2,Float64}
+    walkoff_angle_hi_lo::NTuple{2,typeof(1.0u"rad")}
+    D_dir_hi_lo::NTuple{2,SVector{3,Float64}}
+    E_dir_hi_lo::NTuple{2,SVector{3,Float64}}
+    S_dir_hi_lo::NTuple{2,SVector{3,Float64}}
+    beta0_hi_lo::NTuple{2,typeof(1.0u"m^-1")}
+    beta1_hi_lo::NTuple{2,typeof(1.0u"s * m^-1")}
+    beta2_hi_lo::NTuple{2,typeof(1.0u"s^2 * m^-1")}
+    beta3_hi_lo::NTuple{2,typeof(1.0u"s^3 * m^-1")}
+end
+
+function Base.show(io::IO, rd::RefractionDataHiLo)
+    digits = 3
+
+    # Print header
+    print_refraction_data_header(io, rd)
+
+    println(io, "───────────────────────────────────────────────────────────────────────────")
+
+    # Print content
+    if isa(rd.cr, UnidirectionalCrystal)
+        @printf(io, "%-25s %-25s %-25s\n",
+            "Polarization:",
+            "hi ($(hi_lo_to_o_e(:hi, rd.cr, rd.lambda; rd.temp)))",
+            "lo ($(hi_lo_to_o_e(:lo, rd.cr, rd.lambda; rd.temp)))"
+        )
+    else
+        @printf(io, "%-25s %-25s %-25s\n", "", "hi", "lo")
+    end
+
+    rd_hi = RefractionData(:hi, rd)
+    rd_lo = RefractionData(:lo, rd)
+
+    @printf(io, "%-25s %-25s %-25s\n", "Phase velocity / c₀:", auto_fmt(rd_hi.n; digits), auto_fmt(rd_lo.n; digits))
+    @printf(io, "%-25s %-25s %-25s\n", "Group velocity / c₀:", auto_fmt(rd_hi.group_index), auto_fmt(rd_lo.group_index))
+    @printf(io, "%-25s %-25s %-25s\n", "Walkoff angle (mrad):",
+        auto_fmt(ustrip(u"mrad", rd_hi.walkoff_angle); digits),
+        auto_fmt(ustrip(u"mrad", rd_lo.walkoff_angle); digits),
+    )
+    @printf(io, "%-25s %-25s %-25s\n", "S direction:", vec_str(rd_hi.S_dir), vec_str(rd_lo.S_dir))
+    @printf(io, "%-24s %-25s %-25s\n", "E direction:", "±" * vec_str(rd_hi.E_dir), "±" * vec_str(rd_lo.E_dir))
+    @printf(io, "%-24s %-25s %-25s\n", "D direction:", "±" * vec_str(rd_hi.D_dir), "±" * vec_str(rd_lo.D_dir))
+    @printf(io, "%-25s %-25s %-25s\n", "GDD (fs²/mm):",
+        auto_fmt(ustrip(u"fs^2/mm", rd_hi.beta2); digits),
+        auto_fmt(ustrip(u"fs^2/mm", rd_lo.beta2); digits),
+    )
+    @printf(io, "%-25s %-25s %-25s\n", "TOD (fs³/mm):",
+        auto_fmt(ustrip(u"fs^3/mm", rd_hi.beta3); digits),
+        auto_fmt(ustrip(u"fs^3/mm", rd_lo.beta3); digits),
+    )
+end
+
+function RefractionDataHiLo(
     θ::Angle,
     ϕ::Angle,
     cr::NonlinearCrystal,
-    lambda::Length=default_lambda(cr),
-    temp::Temperature=default_temp(cr);
-    n_hi_lo_only::Bool=false,
+    lambda::Length=default_lambda(cr);
+    temp::Temperature=default_temp(cr),
 )
     k_dir, ε_tensor, n_XYZ = calc_k_dir_ε_tensor_n_XYZ(θ, ϕ, cr, lambda, temp)
     n_hi_lo, D_dir_hi_lo = calc_n_hi_lo_D_dir_hi_lo(k_dir, ε_tensor)
-    n_hi_lo_only && return n_hi_lo
 
     E_dir_hi_lo, S_dir_hi_lo = calc_E_dir_S_dir(k_dir, ε_tensor, D_dir_hi_lo)
 
-    walkoff_angle_hi_lo = (acos(clamp(dot(S_dir_hi_lo[1], k_dir), -1, 1)), acos(clamp(dot(S_dir_hi_lo[2], k_dir), -1, 1))) .|> u"rad"
+    walkoff_angle_hi_lo = (s -> (acos(clamp(dot(s, k_dir), -1, 1)))).(S_dir_hi_lo) .|> u"rad"
 
     # Calculate derivative based data
     group_index_hi_lo = calc_group_index_hi_lo(θ, ϕ, cr, lambda, temp)
@@ -383,7 +440,32 @@ function refraction_data_hi_lo(
     β2_hi_lo = calc_β2_hi_lo(θ, ϕ, cr, lambda, temp)
     β3_hi_lo = calc_β3_hi_lo(θ, ϕ, cr, lambda, temp)
 
-    return n_hi_lo, D_dir_hi_lo, E_dir_hi_lo, S_dir_hi_lo, walkoff_angle_hi_lo, group_index_hi_lo, β0_hi_lo, β1_hi_lo, β2_hi_lo, β3_hi_lo
+    rd = RefractionDataHiLo{typeof(cr)}(
+        θ,
+        ϕ,
+        cr,
+        lambda,
+        temp,
+        n_hi_lo,
+        group_index_hi_lo,
+        walkoff_angle_hi_lo,
+        D_dir_hi_lo,
+        E_dir_hi_lo,
+        S_dir_hi_lo,
+        β0_hi_lo,
+        β1_hi_lo,
+        β2_hi_lo,
+        β3_hi_lo,
+    )
+
+    return rd
+end
+
+# Minmal refractive index calculation, suited for derivatives via ForwardDiff.jl
+function calc_n_hi_lo(θ::Angle, ϕ::Angle, cr::NonlinearCrystal, lambda::Length; temp::Temperature)
+    k_dir, ε_tensor, n_XYZ = calc_k_dir_ε_tensor_n_XYZ(θ, ϕ, cr, lambda, temp)
+    n_hi_lo, D_dir_hi_lo = calc_n_hi_lo_D_dir_hi_lo(k_dir, ε_tensor)
+    return n_hi_lo
 end
 
 function calc_k_dir_ε_tensor_n_XYZ(
@@ -430,7 +512,7 @@ function calc_E_dir_S_dir(
     E_dir_hi_lo = (normalize(ε_tensor \ D_dir_hi_lo[1]), normalize(ε_tensor \ D_dir_hi_lo[2]))
     H_dir_hi_lo = (cross(k_dir, E_dir_hi_lo[1]), cross(k_dir, E_dir_hi_lo[2]))
 
-    # Calculate Poynting vectors and walkoff angles
+    # Calculate Poynting vectors and walkoff k polar angles
     S_dir_hi = normalize(cross(E_dir_hi_lo[1], H_dir_hi_lo[1]))
     S_dir_hi = sign(dot(S_dir_hi, k_dir)) * S_dir_hi # Let S and k point have the same orientation
     S_dir_lo = normalize(cross(E_dir_hi_lo[2], H_dir_hi_lo[2]))
@@ -442,7 +524,8 @@ end
 
 # β0 = k
 function calc_β0_hi_lo(θ::Angle, ϕ::Angle, cr::NonlinearCrystal, lambda::Length=default_lambda(cr), temp::Temperature=default_temp(cr))
-    n_hi_lo = refraction_data_hi_lo(θ, ϕ, cr, lambda, temp; n_hi_lo_only=true)
+    k_dir, ε_tensor, n_XYZ = calc_k_dir_ε_tensor_n_XYZ(θ, ϕ, cr, lambda, temp)
+    n_hi_lo, D_dir_hi_lo = calc_n_hi_lo_D_dir_hi_lo(k_dir, ε_tensor)
     return Tuple([(2π / lambda * n) |> u"m^-1" for n in n_hi_lo])
 end
 calc_β0_hi_lo(θ::Angle, cr::UnidirectionalCrystal, args...; kwargs...) = calc_β0_hi_lo(θ, 0.0u"rad", cr, args...; kwargs...)
@@ -499,27 +582,120 @@ function plot_birefringent_refraction(
     temp::Temperature=default_temp(cr);
 )
     k_dir, ε_tensor, (n_X, n_Y, n_Z) = calc_k_dir_ε_tensor_n_XYZ(θ, ϕ, cr, lambda, temp)
-    n_hi_lo, D_dir_hi_lo, E_dir_hi_lo, S_dir_hi_lo, walkoff_angle_hi_lo = refraction_data_hi_lo(θ, ϕ, cr, lambda, temp)
+    rd = RefractionDataHiLo(θ, ϕ, cr, lambda; temp)
 
     f = Figure()
     ax = Axis3(f[1, 1], azimuth=0.1π, elevation=0.05π, aspect=:data, viewmode=:fit)
 
     draw_ellipsoid!(ax, [0, 0, 0], [1 / n_X^2, 1 / n_Y^2, 1 / n_Z^2]; alpha=0.2)
 
-    lines!(ax, [(0, 0, 0), (S_dir_hi_lo[1]...,)], color=1, colormap=:Paired_12, colorrange=(1, 12), label="S_high", linewidth=5, fxaa=true)
-    lines!(ax, [(0, 0, 0), (S_dir_hi_lo[2]...,)], color=2, colormap=:Paired_12, colorrange=(1, 12), label="S_low", linewidth=5, fxaa=true)
+    lines!(ax, [(0, 0, 0), (rd.S_dir_hi_lo[1]...,)], color=1, colormap=:Paired_12, colorrange=(1, 12), label="S_high", linewidth=5, fxaa=true)
+    lines!(ax, [(0, 0, 0), (rd.S_dir_hi_lo[2]...,)], color=2, colormap=:Paired_12, colorrange=(1, 12), label="S_low", linewidth=5, fxaa=true)
 
-    lines!(ax, [(0, 0, 0), (E_dir_hi_lo[1]...,) .* 0.2], color=3, colormap=:Paired_12, colorrange=(1, 12), label="E_high", linewidth=5, fxaa=true)
-    lines!(ax, [(0, 0, 0), (E_dir_hi_lo[2]...,) .* 0.2], color=4, colormap=:Paired_12, colorrange=(1, 12), label="E_low", linewidth=5, fxaa=true)
+    lines!(ax, [(0, 0, 0), (rd.E_dir_hi_lo[1]...,) .* 0.2], color=3, colormap=:Paired_12, colorrange=(1, 12), label="E_high", linewidth=5, fxaa=true)
+    lines!(ax, [(0, 0, 0), (rd.E_dir_hi_lo[2]...,) .* 0.2], color=4, colormap=:Paired_12, colorrange=(1, 12), label="E_low", linewidth=5, fxaa=true)
 
-    lines!(ax, [(0, 0, 0), (D_dir_hi_lo[1]...,) .* 0.3], color=5, colormap=:Paired_12, colorrange=(1, 12), label="D_high", linewidth=5, fxaa=true)
-    lines!(ax, [(0, 0, 0), (D_dir_hi_lo[2]...,) .* 0.3], color=6, colormap=:Paired_12, colorrange=(1, 12), label="D_low", linewidth=5, fxaa=true)
+    lines!(ax, [(0, 0, 0), (rd.D_dir_hi_lo[1]...,) .* 0.3], color=5, colormap=:Paired_12, colorrange=(1, 12), label="D_high", linewidth=5, fxaa=true)
+    lines!(ax, [(0, 0, 0), (rd.D_dir_hi_lo[2]...,) .* 0.3], color=6, colormap=:Paired_12, colorrange=(1, 12), label="D_low", linewidth=5, fxaa=true)
 
-    lines!(ax, [(0, 0, 0), (k_dir...,)], color=7, colormap=:Paired_12, colorrange=(1, 12), label="k", linewidth=5, fxaa=true)
+    lines!(ax, [(0, 0, 0), (rd.k_dir...,)], color=7, colormap=:Paired_12, colorrange=(1, 12), label="k", linewidth=5, fxaa=true)
 
     Legend(f[1, 2], ax)
 
     return f
+end
+
+struct RefractionData{CT<:NonlinearCrystal}
+    hi_or_lo::Symbol
+    theta::typeof(1.0u"rad")
+    phi::typeof(1.0u"rad")
+    cr::CT
+    lambda::typeof(1.0u"m")
+    temp::typeof(1.0u"K")
+    n::Float64
+    group_index::Float64
+    walkoff_angle::typeof(1.0u"rad")
+    D_dir::SVector{3,Float64}
+    E_dir::SVector{3,Float64}
+    S_dir::SVector{3,Float64}
+    beta0::typeof(1.0u"m^-1")
+    beta1::typeof(1.0u"s * m^-1")
+    beta2::typeof(1.0u"s^2 * m^-1")
+    beta3::typeof(1.0u"s^3 * m^-1")
+end
+
+function Base.show(io::IO, rd::RefractionData)
+    digits = 3
+
+    # Print header
+    print_refraction_data_header(io, rd)
+
+    # Print content
+    if isa(rd.cr, UnidirectionalCrystal)
+        if rd.hi_or_lo === :hi
+            @printf(io, "%-25s %-25s\n",
+                "",
+                "hi ($(hi_lo_to_o_e(:hi, rd.cr, rd.lambda; rd.temp)))",
+            )
+        else
+            @printf(io, "%-25s %-25s\n",
+                "Polarization:",
+                "lo ($(hi_lo_to_o_e(:lo, rd.cr, rd.lambda; rd.temp)))",
+            )
+        end
+    else
+        @printf(io, "%-25s %-25s\n", "", rd.hi_or_lo === :hi ? "hi" : "lo")
+    end
+
+    @printf(io, "%-25s %-25s\n", "Phase velocity / c₀:", auto_fmt(rd.n; digits))
+    @printf(io, "%-25s %-25s\n", "Group velocity / c₀:", auto_fmt(rd.group_index))
+    @printf(io, "%-25s %-25s\n", "Walkoff angle (mrad):",
+        auto_fmt(ustrip(u"mrad", rd.walkoff_angle); digits),
+    )
+    @printf(io, "%-25s %-25s\n", "S direction:", vec_str(rd.S_dir))
+    @printf(io, "%-24s %-25s\n", "E direction:", "±" * vec_str(rd.E_dir))
+    @printf(io, "%-24s %-25s\n", "D direction:", "±" * vec_str(rd.D_dir))
+    @printf(io, "%-25s %-25s\n", "GDD (fs²/mm):",
+        auto_fmt(ustrip(u"fs^2/mm", rd.beta2); digits),
+    )
+    @printf(io, "%-25s %-25s\n", "TOD (fs³/mm):",
+        auto_fmt(ustrip(u"fs^3/mm", rd.beta3); digits),
+    )
+end
+
+function print_refraction_data_header(io::IO, rd::Union{RefractionDataHiLo,RefractionData})
+    @printf(io, "%-25s %s\n", "Crystal:", rd.cr.metadata[:description])
+
+    @printf(io, "%-25s %s\n", "Wavelength:", uconvert(u"µm", rd.lambda))
+
+    @printf(io, "%-25s θ: %3.1f°, ϕ: %3.1f°\n", "k angles:",
+        ustrip(u"°", rd.theta), ustrip(u"°", rd.phi))
+
+    @printf(io, "%-25s %-25s\n", "k direction:",
+        vec_str(angles_to_vector(rd.theta, rd.phi))
+    )
+
+    @printf(io, "%-25s %3.1f K (%3.1f °C)\n", "Temperature:",
+        ustrip(u"K", rd.temp), ustrip(u"°C", rd.temp))
+end
+
+function RefractionData(hi_or_lo::Symbol, rd::RefractionDataHiLo{CT}) where {CT}
+    fields = map(fieldnames(RefractionDataHiLo)) do f
+        f in (:theta, :phi, :cr, :lambda, :temp) && return getfield(rd, f)
+        return getfield(rd, f)[hi_or_lo == :hi ? 1 : 2]
+    end
+    return RefractionData{CT}(hi_or_lo, fields...)
+end
+
+function RefractionData(
+    hi_or_lo::Symbol,
+    θ::Angle,
+    ϕ::Angle,
+    cr::NonlinearCrystal,
+    lambda::Length=default_lambda(cr);
+    temp::Temperature=default_temp(cr),
+)
+    return RefractionData(hi_or_lo, RefractionDataHiLo(θ, ϕ, cr, lambda; temp))
 end
 
 function plot_refractiveindex(

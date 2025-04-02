@@ -8,7 +8,7 @@ function noncritical_pm_label(
     ϕ_pm,
     cr::NonlinearCrystal,
     temp::Temperature,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     lambda_r_switch::Symbol,
 )
     lambda_b = position[1] * u"µm"
@@ -18,13 +18,13 @@ function noncritical_pm_label(
     elseif lambda_r_switch == :lambda_r2
         lambda_r2 = position[2] * u"µm"
     end
-    pm = find_nearest_pm_along_theta_phi(θ_pm, ϕ_pm, hi_or_lo_r1_r2_b, cr; temp, lambda_r1, lambda_r2, lambda_b)
+    pm = find_nearest_pm_along_theta_phi(θ_pm, ϕ_pm, hi_or_lo_rrb, cr; temp, lambda_r1, lambda_r2, lambda_b)
     return isnothing(pm) ? "" : plot_pm_label(pm)
 end
 
 function calc_raw_noncritical_pm_lines(
     principal_axis::Symbol,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_b_min::Union{Nothing,Length}=nothing,
     lambda_b_max::Union{Nothing,Length}=nothing,
@@ -38,7 +38,7 @@ function calc_raw_noncritical_pm_lines(
 
     range_lambda_r12, range_lambda_b, all_delta_k = calc_delta_k_map(
         θ_ϕ_principal_axis...,
-        hi_or_lo_r1_r2_b,
+        hi_or_lo_rrb,
         cr;
         lambda_b_min,
         lambda_b_max,
@@ -61,7 +61,7 @@ end
 
 function plot_delta_k_heatmap(
     principal_axis::Symbol,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_b_min::Union{Nothing,Length}=nothing,
     lambda_b_max::Union{Nothing,Length}=nothing,
@@ -76,7 +76,7 @@ function plot_delta_k_heatmap(
 
     range_lambda_r12, range_lambda_b, all_delta_k = calc_delta_k_map(
         θ_ϕ_principal_axis...,
-        hi_or_lo_r1_r2_b,
+        hi_or_lo_rrb,
         cr;
         lambda_b_min,
         lambda_b_max,
@@ -92,7 +92,7 @@ function plot_delta_k_heatmap(
         f[1, 1],
         xlabel="λ_b",
         ylabel="λ_r12",
-        title="$(cr.metadata[:description])\nΔk along positive $(principal_axis) axis, temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_r1_r2_b) # TODO: Add lambda names and o/e
+        title="$(cr.metadata[:description])\nΔk along positive $(principal_axis) axis, temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_rrb) # TODO: Add lambda names and o/e
         dim1_conversion=uc,
         dim2_conversion=uc,
     )
@@ -152,7 +152,7 @@ end
 
 function calc_noncritical_pm_lines(
     principal_axis::Symbol,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_b_min::Union{Nothing,Length}=nothing,
     lambda_b_max::Union{Nothing,Length}=nothing,
@@ -163,7 +163,7 @@ function calc_noncritical_pm_lines(
 )
     cpl = calc_raw_noncritical_pm_lines(
         principal_axis,
-        hi_or_lo_r1_r2_b,
+        hi_or_lo_rrb,
         cr;
         lambda_b_min,
         lambda_b_max,
@@ -174,7 +174,7 @@ function calc_noncritical_pm_lines(
     )
 
     # If both red waves are polarized equally (type 1 phasematching), the plot lines show a helpful phase match symmetry around the line cont_r_raw = 2 * cont_b_raw
-    is_type_one = (hi_or_lo_r1_r2_b[1] == hi_or_lo_r1_r2_b[2])
+    is_type_one = (hi_or_lo_rrb[1] == hi_or_lo_rrb[2])
 
     all_segments_r = []
     all_segments_b = []
@@ -216,7 +216,7 @@ end
 function plot_single_noncritical_pm!(
     ax::Axis,
     principal_axis::Symbol,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_b_min::Union{Nothing,Length}=nothing,
     lambda_b_max::Union{Nothing,Length}=nothing,
@@ -226,11 +226,11 @@ function plot_single_noncritical_pm!(
     ngrid=50,
     tol=1e-14u"nm^-1",
 )
-    is_type_1 = hi_or_lo_r1_r2_b[1] === hi_or_lo_r1_r2_b[2]
+    is_type_1 = hi_or_lo_rrb[1] === hi_or_lo_rrb[2]
 
     all_segments_b, all_segments_r1, all_cb_intersections, all_cr_intersections = calc_noncritical_pm_lines(
         principal_axis,
-        hi_or_lo_r1_r2_b,
+        hi_or_lo_rrb,
         cr;
         lambda_b_min,
         lambda_b_max,
@@ -248,13 +248,13 @@ function plot_single_noncritical_pm!(
         marker_y_r1[] = is_r1 ? [pos[2]] : [1 / (1 / pos[1] - 1 / pos[2])]
         marker_y_r2[] = is_r1 ? [1 / (1 / pos[1] - 1 / pos[2])] : [pos[2]]
 
-        pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_r1_r2_b, cr; lambda_r1=marker_y_r1[][1], lambda_b=pos[1], temp, principal_axis, ngrid, tol)
+        pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_rrb, cr; lambda_r1=marker_y_r1[][1], lambda_b=pos[1], temp, principal_axis, ngrid, tol)
         return "$(is_type_1 ? "Type 1" : "Type 2") noncritical phasematch\n" * plot_pm_label(pm)
     end
 
     shg_lab = (plot, idx, pos) -> begin
         pos = pos * u"µm"
-        pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_r1_r2_b, cr; lambda_r1=pos[2], lambda_b=pos[1], temp, principal_axis, ngrid, tol)
+        pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_rrb, cr; lambda_r1=pos[2], lambda_b=pos[1], temp, principal_axis, ngrid, tol)
         return "$(is_type_1 ? "Type 1" : "Type 2") noncritical phasematch SHG point\n" * plot_pm_label(pm)
     end
 
@@ -266,8 +266,8 @@ function plot_single_noncritical_pm!(
         return nothing
     end
 
-    [lines!(ax, all_segments_b[i], all_segments_r1[i]; linestyle=hi_or_lo_r1_r2_b[1] === :hi ? :dash : :solid, color=COL_R1, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
-    [lines!(ax, all_segments_b[i], 1 ./ (1 ./ all_segments_b[i] .- 1 ./ all_segments_r1[i]); linestyle=hi_or_lo_r1_r2_b[2] === :hi ? :dash : :solid, color=COL_R2, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
+    [lines!(ax, all_segments_b[i], all_segments_r1[i]; linestyle=hi_or_lo_rrb[1] === :hi ? :dash : :solid, color=COL_R1, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
+    [lines!(ax, all_segments_b[i], 1 ./ (1 ./ all_segments_b[i] .- 1 ./ all_segments_r1[i]); linestyle=hi_or_lo_rrb[2] === :hi ? :dash : :solid, color=COL_R2, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
     !isempty(all_cb_intersections) && scatter!(ax, all_cb_intersections, all_cr_intersections; inspectable=true, inspector_label=shg_lab)
 
     marker_x = Observable([NaN]) # Workaround: vlines! is not yet compatible with unit observables
@@ -283,7 +283,7 @@ end
 function plot_noncritical_pms(
     principal_axis::Symbol,
     cr::NonlinearCrystal;
-    hi_or_lo_r1_r2_b::Union{AbstractVector{Symbol},AbstractVector{<:AbstractVector{Symbol}},Nothing}=nothing,
+    hi_or_lo_rrb::Union{NTuple{3,Symbol},AbstractVector{<:NTuple{3,Symbol}},Nothing}=nothing,
     lambda_b_min::Union{Nothing,Length}=nothing,
     lambda_b_max::Union{Nothing,Length}=nothing,
     lambda_r12_min::Union{Nothing,Length}=nothing,
@@ -300,19 +300,19 @@ function plot_noncritical_pms(
         f[1, 1],
         xlabel="λ_b",
         ylabel="λ_r12",
-        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_r1_r2_b) # TODO: Add lambda names and o/e
+        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_rrb) # TODO: Add lambda names and o/e
         dim1_conversion=uc,
         dim2_conversion=uc,
     )
 
-    if isnothing(hi_or_lo_r1_r2_b)
-        hi_or_lo_r1_r2_b = bool_permutations(:hi, :lo, 3)
-        setdiff!(hi_or_lo_r1_r2_b, [[:hi, :lo, :lo], [:hi, :lo, :hi], [:lo, :lo, :lo], [:hi, :hi, :hi]]) # Prevent double plotting of Type 2 noncritical phasematches and unphysical phasematches 
-    elseif typeof(hi_or_lo_r1_r2_b) <: AbstractVector{Symbol}
-        hi_or_lo_r1_r2_b = [hi_or_lo_r1_r2_b]
+    if isnothing(hi_or_lo_rrb)
+        hi_or_lo_rrb = bool_permutations(:hi, :lo, 3)
+        setdiff!(hi_or_lo_rrb, [(:hi, :lo, :lo), (:hi, :lo, :hi), (:lo, :lo, :lo), (:hi, :hi, :hi)]) # Prevent double plotting of Type 2 noncritical phasematches and unphysical phasematches 
+    elseif typeof(hi_or_lo_rrb) <: NTuple{3,Symbol}
+        hi_or_lo_rrb = [hi_or_lo_rrb]
     end
 
-    for hl in hi_or_lo_r1_r2_b
+    for hl in hi_or_lo_rrb
         plot_single_noncritical_pm!(
             ax,
             principal_axis,
@@ -333,7 +333,7 @@ function plot_noncritical_pms(
 end
 
 function plot_delta_k_map(
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_r1::Union{Nothing,Length}=nothing,
     lambda_r2::Union{Nothing,Length}=nothing,
@@ -349,20 +349,20 @@ function plot_delta_k_map(
     size::NTuple{2,Int}=(800, 600),
 )
     # Prepare data
-    lambda_r1_r2_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
+    lambda_rrb = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
 
     if isnothing(temp)
         temp = isa(cr, UnidirectionalCrystal) ? cr.n_o_principal.temp_ref : cr.n_X_principal.temp_ref
     end
 
-    θ_range, ϕ_range, all_delta_k = compute_delta_k_grid(cr, hi_or_lo_r1_r2_b, lambda_r1_r2_b..., temp, n_points)
+    θ_range, ϕ_range, all_delta_k = compute_delta_k_grid(cr, hi_or_lo_rrb, lambda_rrb..., temp, n_points)
     scale_limit = maximum(abs.(all_delta_k))
 
     # Generate contours
     cpl = Makie.Contours.contours(ustrip.(θ_range), ustrip.(ϕ_range), all_delta_k, [0.0])
 
     # Compute optical axes
-    oa = [optical_axis_angle(cr, λ, temp) for λ in lambda_r1_r2_b]
+    oa = [optical_axis_angle(cr, λ, temp) for λ in lambda_rrb]
 
     # Call appropriate plotting subfunction
     if plot_type == :polar
@@ -376,8 +376,8 @@ function plot_delta_k_map(
             cpl,
             pms,
             oa,
-            lambda_r1_r2_b,
-            hi_or_lo_r1_r2_b,
+            lambda_rrb,
+            hi_or_lo_rrb,
             digits,
             show_coordinates,
             show_optical_axes,
@@ -394,8 +394,8 @@ function plot_delta_k_map(
             cpl,
             pms,
             oa,
-            lambda_r1_r2_b,
-            hi_or_lo_r1_r2_b,
+            lambda_rrb,
+            hi_or_lo_rrb,
             digits,
             axis_length,
             show_coordinates,
@@ -418,12 +418,12 @@ function plot_delta_k_map(
     show_coordinates::Bool=true,
     show_optical_axes::Bool=true,
 )
-    return plot_delta_k_map(pm.hi_or_lo_r1_r2_b, pm.cr; lambda_r1=pm.lambda_r1_r2_b[1], lambda_r2=pm.lambda_r1_r2_b[2], lambda_b=pm.lambda_r1_r2_b[3], temp=pm.temp, pms=[pm], n_points, axis_length, digits, plot_type, show_coordinates, show_optical_axes)
+    return plot_delta_k_map(pm.hi_or_lo_rrb, pm.cr; lambda_r1=pm.lambda_rrb[1], lambda_r2=pm.lambda_rrb[2], lambda_b=pm.lambda_rrb[3], temp=pm.temp, pms=[pm], n_points, axis_length, digits, plot_type, show_coordinates, show_optical_axes)
 end
 
 function compute_delta_k_grid(
     cr::NonlinearCrystal,
-    hi_or_lo_r1_r2_b,
+    hi_or_lo_rrb,
     lambda_r1,
     lambda_r2,
     lambda_b,
@@ -437,12 +437,12 @@ function compute_delta_k_grid(
     if isa(cr, UnidirectionalCrystal)
         # No ϕ dependence, compute only one value and repeat
         all_delta_k = [
-            delta_k(θ, 0.0u"°", hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp)
+            delta_k(θ, 0.0u"°", hi_or_lo_rrb, cr; lambda_r1, lambda_r2, lambda_b, temp)
             for θ in θ_range
         ]
         all_delta_k = repeat(reshape(all_delta_k, :, 1), 1, length(ϕ_range))
     else
-        all_delta_k = [delta_k(θ, ϕ, hi_or_lo_r1_r2_b, cr; lambda_r1, lambda_r2, lambda_b, temp) for θ in θ_range, ϕ in ϕ_range]
+        all_delta_k = [delta_k(θ, ϕ, hi_or_lo_rrb, cr; lambda_r1, lambda_r2, lambda_b, temp) for θ in θ_range, ϕ in ϕ_range]
     end
 
     return θ_range, ϕ_range, ustrip.(u"µm^-1", all_delta_k)
@@ -459,8 +459,8 @@ function plot_polar_mode(
     cpl,
     pms::AbstractVector,
     oa::AbstractVector,
-    lambda_r1_r2_b::Tuple{Length,Length,Length},
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    lambda_rrb::Tuple{Length,Length,Length},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     digits::Integer,
     show_coordinates::Bool,
     show_optical_axes::Bool,
@@ -468,7 +468,7 @@ function plot_polar_mode(
 )
     f = Figure(; size)
     cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))"
-    lambda_info = "$(round(u"nm", lambda_r1_r2_b[1]; digits)) (λ_r1, $(hi_or_lo_r1_r2_b[1])) + $(round(u"nm", lambda_r1_r2_b[2]; digits)) (λ_r2, $(hi_or_lo_r1_r2_b[2])) = $(round(u"nm", lambda_r1_r2_b[3]; digits)) (λ_b, $(hi_or_lo_r1_r2_b[3]))"
+    lambda_info = "$(round(u"nm", lambda_rrb[1]; digits)) (λ_r1, $(hi_or_lo_rrb[1])) + $(round(u"nm", lambda_rrb[2]; digits)) (λ_r2, $(hi_or_lo_rrb[2])) = $(round(u"nm", lambda_rrb[3]; digits)) (λ_b, $(hi_or_lo_rrb[3]))"
     ax = Axis(
         f[1, 1],
         xlabel="ϕ",
@@ -478,7 +478,7 @@ function plot_polar_mode(
 
     heatmap!(ax, ϕ_range .|> u"°", θ_range .|> u"°", all_delta_k'; colormap=COLORMAP_HEATMAP, colorrange=(-scale_limit, scale_limit), inspectable=false)
 
-    plot_polar_contours!(ax, cpl, cr, temp, hi_or_lo_r1_r2_b, lambda_r1_r2_b)
+    plot_polar_contours!(ax, cpl, cr, temp, hi_or_lo_rrb, lambda_rrb)
     plot_polar_pms!(ax, pms)
 
     if show_coordinates
@@ -508,12 +508,12 @@ function polar_plot_pm_label(
     position,
     cr::NonlinearCrystal,
     temp::Temperature,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
-    lambda_r1_r2_b::Tuple{Length,Length,Length}
+    hi_or_lo_rrb::NTuple{3,Symbol},
+    lambda_rrb::Tuple{Length,Length,Length}
 )
     θ_pm = position[2] * u"°"
     ϕ_pm = position[1] * u"°"
-    pm = find_nearest_pm_along_theta_phi(θ_pm, ϕ_pm, hi_or_lo_r1_r2_b, cr; temp, lambda_r1=lambda_r1_r2_b[1], lambda_r2=lambda_r1_r2_b[2], lambda_b=lambda_r1_r2_b[3])
+    pm = find_nearest_pm_along_theta_phi(θ_pm, ϕ_pm, hi_or_lo_rrb, cr; temp, lambda_r1=lambda_rrb[1], lambda_r2=lambda_rrb[2], lambda_b=lambda_rrb[3])
     return plot_pm_label(pm)
 end
 
@@ -522,14 +522,14 @@ function plot_polar_contours!(
     cpl,
     cr::NonlinearCrystal,
     temp::Temperature,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
-    lambda_r1_r2_b::Tuple{Length,Length,Length};
+    hi_or_lo_rrb::NTuple{3,Symbol},
+    lambda_rrb::Tuple{Length,Length,Length};
 )
     for (i, cl) in enumerate(cpl.contours[1].lines)
         θi_cl = [v[1] for v in cl.vertices] .|> u"°"
         ϕi_cl = [v[2] for v in cl.vertices] .|> u"°"
 
-        label_fun = (plot, index, position) -> polar_plot_pm_label(plot, index, position, cr, temp, hi_or_lo_r1_r2_b, lambda_r1_r2_b)
+        label_fun = (plot, index, position) -> polar_plot_pm_label(plot, index, position, cr, temp, hi_or_lo_rrb, lambda_rrb)
 
         lines!(
             ax, ϕi_cl, θi_cl;
@@ -607,8 +607,8 @@ function plot_sphere_mode(
     cpl,
     pms::AbstractVector,
     oa::AbstractVector,
-    lambda_r1_r2_b::Tuple{Length,Length,Length},
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    lambda_rrb::Tuple{Length,Length,Length},
+    hi_or_lo_rrb::NTuple{3,Symbol},
     digits::Integer,
     axis_length::Real,
     show_coordinates::Bool,
@@ -617,7 +617,7 @@ function plot_sphere_mode(
 )
     f = Figure(; size)
     cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))"
-    lambda_info = "$(round(u"nm", lambda_r1_r2_b[1]; digits)) (λ_r1, $(hi_or_lo_r1_r2_b[1])) + $(round(u"nm", lambda_r1_r2_b[2]; digits)) (λ_r2, $(hi_or_lo_r1_r2_b[2])) = $(round(u"nm", lambda_r1_r2_b[3]; digits)) (λ_b, $(hi_or_lo_r1_r2_b[3]))"
+    lambda_info = "$(round(u"nm", lambda_rrb[1]; digits)) (λ_r1, $(hi_or_lo_rrb[1])) + $(round(u"nm", lambda_rrb[2]; digits)) (λ_r2, $(hi_or_lo_rrb[2])) = $(round(u"nm", lambda_rrb[3]; digits)) (λ_b, $(hi_or_lo_rrb[3]))"
     ax = Axis3(
         f[1, 1],
         azimuth=0.1π, elevation=0.05π,
@@ -627,7 +627,7 @@ function plot_sphere_mode(
     hidedecorations!(ax, grid=false)
 
     plot_sphere_mesh!(ax, θ_range, ϕ_range, all_delta_k, scale_limit)
-    plot_sphere_contours!(ax, cpl, cr, temp, hi_or_lo_r1_r2_b, lambda_r1_r2_b)
+    plot_sphere_contours!(ax, cpl, cr, temp, hi_or_lo_rrb, lambda_rrb)
     plot_sphere_pms!(ax, pms, axis_length)
 
     if show_coordinates
@@ -663,11 +663,11 @@ function sphere_plot_pm_label(
     position,
     cr::NonlinearCrystal,
     temp::Temperature,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
-    lambda_r1_r2_b::Tuple{Length,Length,Length},
+    hi_or_lo_rrb::NTuple{3,Symbol},
+    lambda_rrb::Tuple{Length,Length,Length},
 )
     θ_pm, ϕ_pm = vector_to_angles(position)
-    pm = find_nearest_pm_along_theta_phi(θ_pm, ϕ_pm, hi_or_lo_r1_r2_b, cr; temp, lambda_r1=lambda_r1_r2_b[1], lambda_r2=lambda_r1_r2_b[2], lambda_b=lambda_r1_r2_b[3])
+    pm = find_nearest_pm_along_theta_phi(θ_pm, ϕ_pm, hi_or_lo_rrb, cr; temp, lambda_r1=lambda_rrb[1], lambda_r2=lambda_rrb[2], lambda_b=lambda_rrb[3])
     return plot_pm_label(pm)
 end
 
@@ -676,14 +676,14 @@ function plot_sphere_contours!(
     cpl,
     cr::NonlinearCrystal,
     temp::Temperature,
-    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
-    lambda_r1_r2_b::Tuple{Length,Length,Length}
+    hi_or_lo_rrb::NTuple{3,Symbol},
+    lambda_rrb::Tuple{Length,Length,Length}
 )
     for (i, cl) in enumerate(cpl.contours[1].lines)
         θ = [v[1] for v in cl.vertices] .|> u"°"
         ϕ = [v[2] for v in cl.vertices] .|> u"°"
 
-        label_fun = (plot, index, position) -> sphere_plot_pm_label(plot, index, position, cr, temp, hi_or_lo_r1_r2_b, lambda_r1_r2_b)
+        label_fun = (plot, index, position) -> sphere_plot_pm_label(plot, index, position, cr, temp, hi_or_lo_rrb, lambda_rrb)
 
         points = [Point3f(angles_to_vector(θi, ϕi)...) for (θi, ϕi) in zip(θ, ϕ)]
         lines!(ax, points; color=COL_CONTOUR, linewidth=4, label=(i == 1 ? "Phase matches" : nothing), inspectable=true, inspector_label=label_fun,
@@ -709,7 +709,7 @@ function plot_sphere_pms!(
     for (i, pm) in enumerate(pms)
         θi_pm = pm.theta_pm
         ϕi_pm = pm.phi_pm
-        E_dirs = pm.E_dir_r1_r2_b
+        E_dirs = pm.E_dir_rrb
 
         ri_pm = Point3f(angles_to_vector(θi_pm, ϕi_pm)...)
 

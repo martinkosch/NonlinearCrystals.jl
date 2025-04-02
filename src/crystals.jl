@@ -2,6 +2,8 @@ export NonlinearCrystal, UnidirectionalCrystal, BidirectionalCrystal, default_la
 
 abstract type NonlinearCrystal end
 
+Base.broadcastable(cr::NonlinearCrystal) = Ref(cr)
+
 function default_lambda(cr::NonlinearCrystal)
     return isnothing(cr.n_X_principal.lambda_range) ? 633u"nm" : sum(cr.n_X_principal.lambda_range) / 2
 end

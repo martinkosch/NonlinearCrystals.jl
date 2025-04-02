@@ -237,9 +237,6 @@ function pm_wavelengths(;
         lambda_b = 1 / (1 / lambda_r1 + 1 / lambda_r2)
     end
 
-    # Sort red lambdas: r1 by definition always has a higher (or equal) wavelength than r2 
-    lambda_r1 < lambda_r2 && ((lambda_r1, lambda_r2) = (lambda_r2, lambda_r1))
-
     @assert 1 / lambda_r1 + 1 / lambda_r2 ≈ 1 / lambda_b "Phasematching is only fulfilled for 1 / λ_r1 + 1 / λ_r2 = 1 / λ_b."
 
     return lambda_r1, lambda_r2, lambda_b
@@ -309,6 +306,40 @@ function delta_k_with_shifting(
         lambda_b=lambda_b_shifted,
         temp=temp + delta_temp,
     )
+end
+
+function calc_delta_k_map(
+    theta::Angle,
+    phi::Angle,
+    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    cr::NonlinearCrystal;
+    lambda_b_min::Union{Nothing,Length}=nothing,
+    lambda_b_max::Union{Nothing,Length}=nothing,
+    lambda_r12_min::Union{Nothing,Length}=nothing,
+    lambda_r12_max::Union{Nothing,Length}=nothing,
+    temp::Temperature=default_temp(cr),
+    ngrid=100,
+)
+    isnothing(lambda_b_min) && (lambda_b_min = valid_lambda_range(cr)[1])
+    isnothing(lambda_b_max) && (lambda_b_max = valid_lambda_range(cr)[2] / 2)
+    isnothing(lambda_r12_min) && (lambda_r12_min = valid_lambda_range(cr)[1])
+    isnothing(lambda_r12_max) && (lambda_r12_max = valid_lambda_range(cr)[2])
+    range_lambda_b = LinRange(lambda_b_min, lambda_b_max, ngrid) .|> u"µm"
+    range_lambda_r12 = LinRange(lambda_r12_min, lambda_r12_max, ngrid) .|> u"µm"
+
+    all_delta_k = zeros(length(range_lambda_b), length(range_lambda_r12)) * u"m^-1"
+    for i in CartesianIndices(all_delta_k)
+        (i_b, i_r12) = (i[1], i[2])
+        lambda_b = range_lambda_b[i_b]
+        lambda_r12 = range_lambda_r12[i_r12]
+        lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_b, lambda_r1=lambda_r12)
+        if all(is_lambda_valid.([lambda_r1, lambda_r2, lambda_b], cr))
+            all_delta_k[i_b, i_r12] = delta_k(theta, phi, hi_or_lo_r1_r2_b, cr; temp, lambda_r1, lambda_r2, lambda_b)
+        else
+            all_delta_k[i_b, i_r12] = NaN * u"m^-1"
+        end
+    end
+    return range_lambda_r12, range_lambda_b, all_delta_k
 end
 
 function lambda_L_bandwidths(group_index_r1_r2_b::AbstractVector{<:Real})

@@ -34,30 +34,73 @@ function calc_raw_noncritical_pm_lines(
     ngrid=100,
 )
     @assert principal_axis in [:X, :Y, :Z]
+    θ_ϕ_principal_axis = axes_to_θ_ϕ(principal_axis)[1]
 
-    isnothing(lambda_b_min) && (lambda_b_min = valid_lambda_range(cr)[1])
-    isnothing(lambda_b_max) && (lambda_b_max = valid_lambda_range(cr)[2] / 2)
-    isnothing(lambda_r12_min) && (lambda_r12_min = valid_lambda_range(cr)[1])
-    isnothing(lambda_r12_max) && (lambda_r12_max = valid_lambda_range(cr)[2])
-    range_lambda_b = LinRange(lambda_b_min, lambda_b_max, ngrid) .|> u"µm"
-    range_lambda_r12 = LinRange(lambda_r12_min, lambda_r12_max, ngrid) .|> u"µm"
-
-    all_delta_k = zeros(length(range_lambda_b), length(range_lambda_r12))
-    for i in CartesianIndices(all_delta_k)
-        (i_b, i_r12) = (i[1], i[2])
-        lambda_b = range_lambda_b[i_b]
-        lambda_r12 = range_lambda_r12[i_r12]
-        lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_b, lambda_r1=lambda_r12)
-        if is_lambda_valid(lambda_r1, cr) && is_lambda_valid(lambda_r2, cr) && is_lambda_valid(lambda_b, cr)
-            all_delta_k[i_b, i_r12] = ustrip(u"m^-1", delta_k(axes_to_θ_ϕ(principal_axis)[1]..., hi_or_lo_r1_r2_b, cr; temp, lambda_r1, lambda_r2, lambda_b))
-        else
-            all_delta_k[i_b, i_r12] = NaN
-        end
-    end
+    range_lambda_r12, range_lambda_b, all_delta_k = calc_delta_k_map(
+        θ_ϕ_principal_axis...,
+        hi_or_lo_r1_r2_b,
+        cr;
+        lambda_b_min,
+        lambda_b_max,
+        lambda_r12_min,
+        lambda_r12_max,
+        temp,
+        ngrid,
+    )
 
     # Extract Δk=0 isolines using Makie contour function
-    cpl = Makie.Contours.contour(range_lambda_b, range_lambda_r12, all_delta_k, 0.0)
+    cpl = Makie.Contours.contour(
+        range_lambda_b, 
+        range_lambda_r12, 
+        ustrip.(u"m^-1", all_delta_k), 
+        0.0, 
+        VT=NTuple{2,eltype(range_lambda_b)}
+    )
     return cpl # Makie.jl contour object with list of `lines` containing list of `vertices`
+end
+
+function plot_delta_k_heatmap(
+    principal_axis::Symbol,
+    hi_or_lo_r1_r2_b::AbstractVector{Symbol},
+    cr::NonlinearCrystal;
+    lambda_b_min::Union{Nothing,Length}=nothing,
+    lambda_b_max::Union{Nothing,Length}=nothing,
+    lambda_r12_min::Union{Nothing,Length}=nothing,
+    lambda_r12_max::Union{Nothing,Length}=nothing,
+    temp::Temperature=default_temp(cr),
+    ngrid=100,
+    size::NTuple{2,Int}=(800, 600),
+)
+    @assert principal_axis in [:X, :Y, :Z]
+    θ_ϕ_principal_axis = axes_to_θ_ϕ(principal_axis)[1]
+
+    range_lambda_r12, range_lambda_b, all_delta_k = calc_delta_k_map(
+        θ_ϕ_principal_axis...,
+        hi_or_lo_r1_r2_b,
+        cr;
+        lambda_b_min,
+        lambda_b_max,
+        lambda_r12_min,
+        lambda_r12_max,
+        temp,
+        ngrid,
+    )
+
+    f = Figure(; size)
+    uc = Makie.UnitfulConversion(u"µm"; units_in_label=true)
+    ax = Axis(
+        f[1, 1],
+        xlabel="λ_b",
+        ylabel="λ_r12",
+        title="$(cr.metadata[:description])\nΔk along positive $(principal_axis) axis, temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_r1_r2_b) # TODO: Add lambda names and o/e
+        dim1_conversion=uc,
+        dim2_conversion=uc,
+    )
+    scale_limit = ustrip(u"m^-1", maximum(abs.(all_delta_k[.!isnan.(all_delta_k)])))
+
+    heatmap!(ax, range_lambda_b, range_lambda_r12, ustrip.(u"m^-1", all_delta_k); colorrange=(-scale_limit, scale_limit), colormap=:vik)
+    contour!(ax, range_lambda_b, range_lambda_r12, ustrip.(u"m^-1", all_delta_k); levels=[0.0], color=COL_CONTOUR, linewidth=2)
+    return f
 end
 
 function split_and_interpolate(cb::AbstractVector, cr::AbstractVector, sign_switches, fractions, segment_signs)
@@ -142,7 +185,7 @@ function calc_noncritical_pm_lines(
         cont_b_raw = [v[1] for v in cl.vertices]
         cont_r_raw = [v[2] for v in cl.vertices]
 
-        # Kick out all NaNs and split contours into segments at all NaNs
+        # Split contours into segments at all NaNs and remove all NaNs
         for (cont_b, cont_r) in zip(split_on_nan(cont_b_raw, cont_r_raw)...)
             shear_cr = cont_r .- 2 * cont_b # All SHG points are now on the y = 0 axis
             segments_cb, segments_cr, cb_intersections, cr_intersections, segment_signs = split_and_interpolate(cont_b, cont_r, sign_switch_fractions(shear_cr)...)
@@ -257,7 +300,7 @@ function plot_noncritical_pms(
         f[1, 1],
         xlabel="λ_b",
         ylabel="λ_r12",
-        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, Temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_r1_r2_b) # TODO: Add lambda names and o/e
+        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_r1_r2_b) # TODO: Add lambda names and o/e
         dim1_conversion=uc,
         dim2_conversion=uc,
     )

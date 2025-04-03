@@ -42,18 +42,39 @@ expected = [
 @test length(perms) == 4
 @test all(p -> p in expected, perms)
 
-
+## Custom Eigen tests
+# --- Diagonal matrix (distinct)
 A = [2.0 0.0; 0.0 3.0]
 vals, vecs = NonlinearCrystals.eigen_2d(A)
-@test isapprox(vals[1], 2.0, atol=1e-8)
-@test isapprox(vals[2], 3.0, atol=1e-8)
-# Check orthonormality
-@test isapprox(dot(vecs[:,1], vecs[:,2]), 0.0, atol=1e-8)
+@test sort(vals) ≈ [2.0, 3.0]
+@test isapprox(dot(vecs[:,1], vecs[:,2]), 0.0; atol=1e-8)
+
+# --- Identity matrix (degenerate eigenvalues)
+A = [1.0 0.0; 0.0 1.0]
+vals, vecs = NonlinearCrystals.eigen_2d(A)
+@test sort(vals) ≈ [1.0, 1.0]
+@test isapprox(norm(vecs[:,1]), 1.0; atol=1e-8)
+@test isapprox(norm(vecs[:,2]), 1.0; atol=1e-8)
+
+# --- Symmetric off-diagonal
+A = [2.0 1.0; 1.0 2.0]
+vals, vecs = NonlinearCrystals.eigen_2d(A)
+λ_expected = [1.0, 3.0]
+@test sort(vals) ≈ λ_expected
+@test isapprox(dot(vecs[:,1], vecs[:,2]), 0.0; atol=1e-8)
+
+# --- Complex eigenvalues but the function is only suited for symmetric matrices 
+A = [0.0 -1.0; 1.0 0.0]
+@test_throws AssertionError NonlinearCrystals.eigenvals_2d(A)
+
+# --- Negative eigenvalues
+A = [-2.0 0.0; 0.0 -3.0]
+vals, vecs = NonlinearCrystals.eigen_2d(A)
+@test sort(vals) ≈ [-3.0, -2.0]
+@test isapprox(dot(vecs[:,1], vecs[:,2]), 0.0; atol=1e-8)
 
 
 λ0 = 1.0u"μm"
 Δω = 1e12u"Hz"
 λ_shifted = NonlinearCrystals.shift_lambda_with_freq(λ0, Δω)
 @test λ_shifted < λ0  # Positive Δω reduces wavelength
-
-

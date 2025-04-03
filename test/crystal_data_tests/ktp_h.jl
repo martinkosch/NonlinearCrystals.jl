@@ -34,9 +34,13 @@ using Unitful
 
 # Test sampled phasematches (from: Handbook of Nonlinear Crystals)
 pm1 = find_nearest_pm_along_theta_phi(90u"°", 24.0u"°", (:lo, :hi, :lo), KTP_H; lambda_r1=1.062u"µm", lambda_b=1.062u"µm" / 2, temp=293u"K") 
-# @test all(isnothing.(pm1.o_or_e_rrb)) || all(pm1.o_or_e_rrb .== (:e, :o, :e))
+@test all(pm1.pm_type[1].o_or_e_rrb .== (:e, :o, :e))
+@test pm1.pm_type[1].principal_plane == :XY
+@test isnothing(pm1.pm_type[2])
 @test isapprox(pm1.phi_pm, 24.0u"°", atol=ustrip(u"rad", 4u"°"))
 
 pm2 = find_nearest_pm_along_theta_phi(63.2u"°", 90.0u"°", (:lo, :hi, :lo), KTP_H; lambda_r1=1.338u"µm", lambda_b=0.446u"µm", temp=293u"K")
-# @test all(isnothing.(pm2.o_or_e_rrb)) || all(pm2.o_or_e_rrb .== (:o, :e, :o))
+@test all(pm2.pm_type[1].o_or_e_rrb .== (:o, :e, :o))
+@test pm2.pm_type[1].principal_plane == :YZ
+@test isnothing(pm2.pm_type[2])
 @test isapprox(pm2.theta_pm, 63.2u"°", atol=ustrip(u"rad", 4u"°"))

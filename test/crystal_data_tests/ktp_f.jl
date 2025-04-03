@@ -37,20 +37,28 @@ using Unitful
 
 # Test sampled phasematches (from: Handbook of Nonlinear Crystals)
 pm1 = find_nearest_pm_along_theta_phi(90u"°", 24.59u"°", (:lo, :hi, :lo), KTP_H; lambda_r1=1.0642u"µm", lambda_b=0.5321u"µm", temp=293u"K") 
-# @test all(isnothing.(pm1.o_or_e_rrb)) || all(pm1.o_or_e_rrb .== (:e, :o, :e))
+@test all(pm1.pm_type[1].o_or_e_rrb .== (:e, :o, :e))
+@test pm1.pm_type[1].principal_plane == :XY
+@test isnothing(pm1.pm_type[2])
 @test isapprox(pm1.phi_pm, 24.59u"°", atol=ustrip(u"rad", 2u"°"))
 @test isapprox(pm1.walkoff_angle_rrb[1], 0.202u"°", atol=ustrip(u"rad", 0.1u"°")) 
 @test isapprox(pm1.walkoff_angle_rrb[2], 0.0u"°", atol=ustrip(u"rad", 0.1u"°")) 
 @test isapprox(pm1.walkoff_angle_rrb[3], 0.268u"°", atol=ustrip(u"rad", 0.1u"°")) 
 
 pm2 = find_nearest_pm_along_theta_phi(57.95u"°", 90.0u"°", (:lo, :hi, :lo), KTP_H; lambda_r1=2.9365u"µm", lambda_b=2.9365u"µm" / 2, temp=293u"K")
-# @test all(isnothing.(pm2.o_or_e_rrb)) || all(pm2.o_or_e_rrb .== (:o, :e, :o))
+@test all(pm2.pm_type[1].o_or_e_rrb .== (:o, :e, :o))
+@test pm2.pm_type[1].principal_plane == :YZ
+@test isnothing(pm2.pm_type[2])
 @test isapprox(pm2.theta_pm, 57.95u"°", atol=ustrip(u"rad", 4u"°"))
 
 pm3 = find_nearest_pm_along_theta_phi(56.22u"°", 90.0u"°", (:lo, :hi, :lo), KTP_H; lambda_r1=1.2u"µm", lambda_b=1.2u"µm" / 2, temp=293u"K")
-# @test all(isnothing.(pm3.o_or_e_rrb)) || all(pm3.o_or_e_rrb .== (:o, :e, :o))
+@test all(pm3.pm_type[1].o_or_e_rrb .== (:o, :e, :o))
+@test pm3.pm_type[1].principal_plane == :YZ
+@test isnothing(pm3.pm_type[2])
 @test isapprox(pm3.theta_pm, 56.22u"°", atol=ustrip(u"rad", 4u"°"))
 
 pm4 = find_nearest_pm_along_theta_phi(67.47u"°", 0.0u"°", (:lo, :hi, :lo), KTP_H; lambda_r1=1.2u"µm", lambda_b=1.2u"µm" / 2, temp=293u"K")
-# @test all(isnothing.(pm4.o_or_e_rrb)) || all(pm4.o_or_e_rrb .== (:o, :e, :o))
+@test all(pm4.pm_type[1].o_or_e_rrb .== (:o, :e, :o))
+@test pm4.pm_type[1].principal_plane == :XZ
+@test isnothing(pm4.pm_type[2])
 @test isapprox(pm4.theta_pm, 67.47u"°", atol=ustrip(u"rad", 4u"°"))

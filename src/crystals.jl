@@ -264,6 +264,33 @@ function Base.getproperty(cr::BidirectionalCrystal, sym::Symbol)
     end
 end
 
+function calc_o_or_e(
+    principal_plane::Symbol,
+    E_dir::AbstractVector{<:Number};
+    angle_tol::Angle=0.1u"°",
+)
+    # For UnidirectionalCrystal, all waves with an E field perpendicular to the optical axis z are ordinary (:o)
+    if principal_plane === :UD
+        z_vec = @SVector [0.0, 0.0, 1.0]
+        is_o = abs((acos(clamp(abs(dot(z_vec, E_dir)), -1, 1)) |> u"rad") - 90u"°") < angle_tol
+        return is_o ? (:o) : (:e)
+    end
+
+    # For BidirectionalCrystal, ordinary and extraordinary can only be assigned in the principal planes
+    if principal_plane === :YZ
+        plane_normal = @SVector [1.0, 0.0, 0.0]
+    elseif principal_plane === :XZ
+        plane_normal = @SVector [0.0, 1.0, 0.0]
+    elseif principal_plane === :XY
+        plane_normal = @SVector [0.0, 0.0, 1.0]
+    else
+        @error "Principal plane '$(principal_plane)' unknown."
+    end
+
+    is_o = abs((acos(clamp(abs(dot(plane_normal, E_dir)), -1, 1)) |> u"rad")) < angle_tol
+    return is_o ? (:o) : (:e)
+end
+
 function o_e_to_hi_lo(
     o_or_e::Symbol,
     cr::UnidirectionalCrystal,
@@ -360,12 +387,28 @@ function optical_axis_angle(
     return 0.0u"rad"
 end
 
+struct RefractionTypeHiLo
+    principal_plane::Union{Symbol}
+    o_or_e_hi_lo::NTuple{2,Symbol}
+end
+
+function RefractionTypeHiLo(
+    principal_plane::Symbol,
+    E_dir_hi_lo::NTuple{2,<:AbstractVector{<:Number}};
+    angle_tol::Angle=0.1u"°",
+)
+    o_or_e_hi_lo = Tuple(calc_o_or_e(principal_plane, E_dir; angle_tol) for E_dir in E_dir_hi_lo)
+
+    return RefractionTypeHiLo(principal_plane, o_or_e_hi_lo)
+end
+
 struct RefractionDataHiLo{CT<:NonlinearCrystal}
     theta::typeof(1.0u"rad")
     phi::typeof(1.0u"rad")
     cr::CT
     lambda::typeof(1.0u"m")
     temp::typeof(1.0u"K")
+    refr_type_hi_lo::NTuple{2,Union{Nothing,RefractionTypeHiLo}}
     n_hi_lo::NTuple{2,Float64}
     group_index_hi_lo::NTuple{2,Float64}
     walkoff_angle_hi_lo::NTuple{2,typeof(1.0u"rad")}
@@ -390,11 +433,16 @@ function Base.show(io::IO, rd::RefractionDataHiLo)
     if isa(rd.cr, UnidirectionalCrystal)
         @printf(io, "%-25s %-25s %-25s\n",
             "Polarization:",
-            "hi ($(hi_lo_to_o_e(:hi, rd.cr, rd.lambda; rd.temp)))",
-            "lo ($(hi_lo_to_o_e(:lo, rd.cr, rd.lambda; rd.temp)))"
+            "hi ($(rd.refr_type_hi_lo[1].o_or_e_hi_lo[1]))",
+            "lo ($(rd.refr_type_hi_lo[1].o_or_e_hi_lo[2]))"
         )
     else
-        @printf(io, "%-25s %-25s %-25s\n", "", "hi", "lo")
+        @printf(io, "%-25s %-25s %-25s\n", "Polarization:", "hi", "lo")
+        for t in rd.refr_type_hi_lo
+            isnothing(t) && continue
+            pols = ["$(t.o_or_e_hi_lo[i])" for i in 1:2]
+            @printf(io, "%-25s %-25s %-25s\n", "$(t.principal_plane) plane:", pols...)
+        end
     end
 
     rd_hi = RefractionData(:hi, rd)
@@ -425,11 +473,20 @@ function RefractionDataHiLo(
     cr::NonlinearCrystal,
     lambda::Length=default_lambda(cr);
     temp::Temperature=default_temp(cr),
+    angle_tol::Angle=0.1u"°",
 )
     k_dir, ε_tensor, n_XYZ = calc_k_dir_ε_tensor_n_XYZ(θ, ϕ, cr, lambda, temp)
     n_hi_lo, D_dir_hi_lo = calc_n_hi_lo_D_dir_hi_lo(k_dir, ε_tensor)
 
     E_dir_hi_lo, S_dir_hi_lo = calc_E_dir_S_dir(k_dir, ε_tensor, D_dir_hi_lo)
+
+    if isa(cr, UnidirectionalCrystal)
+        # o and e are valid classifiers for UnidirectionalCrystal even if propagating outside of the pricipal planes
+        refr_type_hi_lo = (RefractionTypeHiLo(:UD, E_dir_hi_lo; angle_tol), nothing)
+    else
+        principal_planes = find_principal_planes(θ, ϕ)
+        refr_type_hi_lo = Tuple((isnothing(p) ? nothing : RefractionTypeHiLo(p, E_dir_hi_lo; angle_tol) for p in principal_planes))
+    end
 
     walkoff_angle_hi_lo = (s -> (acos(clamp(dot(s, k_dir), -1, 1)))).(S_dir_hi_lo) .|> u"rad"
 
@@ -446,6 +503,7 @@ function RefractionDataHiLo(
         cr,
         lambda,
         temp,
+        refr_type_hi_lo,
         n_hi_lo,
         group_index_hi_lo,
         walkoff_angle_hi_lo,
@@ -487,7 +545,7 @@ end
 
 function calc_n_hi_lo_D_dir_hi_lo(k_dir::AbstractVector{<:Real}, ε_tensor::AbstractMatrix{<:Real})
     # Construct numerically stable coordinate system around k   
-    smallest_axis = findmin(k_dir)[2]
+    smallest_axis = findmin(abs.(k_dir))[2]
     k_orth1 = normalize(cross(k_dir, [i == smallest_axis ? 1.0 : 0.0 for i in 1:3]))
     k_orth2 = normalize(cross(k_dir, k_orth1))
     P_k_orth = [k_orth1 k_orth2]
@@ -605,6 +663,11 @@ function plot_birefringent_refraction(
     return f
 end
 
+struct RefractionType
+    principal_plane::Union{Symbol}
+    o_or_e::Symbol
+end
+
 struct RefractionData{CT<:NonlinearCrystal}
     hi_or_lo::Symbol
     theta::typeof(1.0u"rad")
@@ -612,6 +675,7 @@ struct RefractionData{CT<:NonlinearCrystal}
     cr::CT
     lambda::typeof(1.0u"m")
     temp::typeof(1.0u"K")
+    refr_type::NTuple{2,Union{Nothing,RefractionTypeHiLo}}
     n::Float64
     group_index::Float64
     walkoff_angle::typeof(1.0u"rad")
@@ -634,7 +698,7 @@ function Base.show(io::IO, rd::RefractionData)
     if isa(rd.cr, UnidirectionalCrystal)
         if rd.hi_or_lo === :hi
             @printf(io, "%-25s %-25s\n",
-                "",
+                "Polarization:",
                 "hi ($(hi_lo_to_o_e(:hi, rd.cr, rd.lambda; rd.temp)))",
             )
         else
@@ -644,7 +708,7 @@ function Base.show(io::IO, rd::RefractionData)
             )
         end
     else
-        @printf(io, "%-25s %-25s\n", "", rd.hi_or_lo === :hi ? "hi" : "lo")
+        @printf(io, "%-25s %-25s\n", "Polarization:", rd.hi_or_lo === :hi ? "hi" : "lo")
     end
 
     @printf(io, "%-25s %-25s\n", "Phase velocity / c₀:", auto_fmt(rd.n; digits))
@@ -668,20 +732,21 @@ function print_refraction_data_header(io::IO, rd::Union{RefractionDataHiLo,Refra
 
     @printf(io, "%-25s %s\n", "Wavelength:", uconvert(u"µm", rd.lambda))
 
-    @printf(io, "%-25s θ: %3.1f°, ϕ: %3.1f°\n", "k angles:",
+    @printf(io, "%-25s θ: %3.2f°, ϕ: %3.2f°\n", "k angles:",
         ustrip(u"°", rd.theta), ustrip(u"°", rd.phi))
 
     @printf(io, "%-25s %-25s\n", "k direction:",
         vec_str(angles_to_vector(rd.theta, rd.phi))
     )
 
-    @printf(io, "%-25s %3.1f K (%3.1f °C)\n", "Temperature:",
+    @printf(io, "%-25s %3.2f K (%3.2f °C)\n", "Temperature:",
         ustrip(u"K", rd.temp), ustrip(u"°C", rd.temp))
 end
 
 function RefractionData(hi_or_lo::Symbol, rd::RefractionDataHiLo{CT}) where {CT}
     fields = map(fieldnames(RefractionDataHiLo)) do f
         f in (:theta, :phi, :cr, :lambda, :temp) && return getfield(rd, f)
+        (f === :refr_type_hi_lo) && return getfield(rd, f)
         return getfield(rd, f)[hi_or_lo == :hi ? 1 : 2]
     end
     return RefractionData{CT}(hi_or_lo, fields...)

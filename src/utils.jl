@@ -74,6 +74,36 @@ function angles_to_vector(theta::Angle, phi::Angle)
     return @SVector [x, y, z]
 end
 
+function find_principal_planes(theta::Angle, phi::Angle; tol::Angle = 0.1u"°")
+    v = angles_to_vector(theta, phi)
+
+    plane_syms = [:YZ, :XZ, :XY]
+    plane_normals = [
+        (@SVector [1.0, 0.0, 0.0]), 
+        (@SVector [0.0, 1.0, 0.0]), 
+        (@SVector [0.0, 0.0, 1.0]),
+    ]
+
+    p1 = nothing
+    p2 = nothing
+    count = 0
+    for (sym, normal) in zip(plane_syms, plane_normals)
+        angle = acos(abs(clamp(dot(v, normal), -1, 1))) |> u"rad"
+        if abs(angle - π/2) ≤ tol
+            count += 1
+            if count == 1
+                p1 = sym
+            elseif count == 2
+                p2 = sym
+                # More than two pricipal plane at once is not possible so we stop here
+                break  
+            end
+        end
+    end
+
+    return (p1, p2)
+end
+
 function axes_to_θ_ϕ(axes::Union{AbstractVector{Symbol},Symbol})
     axes = (axes isa Symbol) ? [axes] : axes
     θ_ϕ_dirs = map(axes) do a
@@ -111,17 +141,32 @@ function bool_permutations(val1, val2, n::Integer)
     return result
 end
 
-function eigen_2d(A::AbstractMatrix)
+function eigenvals_2d(A::AbstractMatrix)
     (a, b, c, d) = A'
-    discr = sqrt(max(0.0, ((a + d) / 2)^2 - (a * d - b * c))) # Bound from below to avoid numerical issues
+    @assert ((a + d) / 2)^2 - (a * d - b * c) >= 0.0 "This function cannot handle imaginary eigenvalues."
+    discr = sqrt(((a + d) / 2)^2 - (a * d - b * c)) 
     eigvals = (a + d) / 2 .+ [-discr, discr]
+    return eigvals
+end
 
-    eigvecs_orth1 = [(@SVector [b, eigvals[1] - a]), (@SVector [eigvals[1] - d, c])]
-    idx_ev1 = findmax(norm.(eigvecs_orth1))[2]
-    eigvecs_orth2 = [(@SVector [b, eigvals[2] - a]), (@SVector [eigvals[2] - d, c])]
-    idx_ev2 = findmax(norm.(eigvecs_orth2))[2]
-    eigvecs_orth = [normalize(eigvecs_orth1[idx_ev1]) normalize(eigvecs_orth2[idx_ev2])]
-    return eigvals, eigvecs_orth
+function eigen_2d(A::AbstractMatrix)
+    eigvals = eigenvals_2d(A')
+    
+    (a, b, c, d) = A'
+    if b == 0 && c == 0 # Catch degenerate case of diagonal matrices
+        if a >= d
+            return [a, d], @SMatrix [1.0 0.0; 0.0 1.0]
+        else
+            return [d, a], @SMatrix [0.0 1.0; 1.0 0.0]
+        end
+    else
+        eigvecs_orth1 = [(@SVector [b, eigvals[1] - a]), (@SVector [eigvals[1] - d, c])]
+        idx_ev1 = findmax(norm.(eigvecs_orth1))[2]
+        eigvecs_orth2 = [(@SVector [b, eigvals[2] - a]), (@SVector [eigvals[2] - d, c])]
+        idx_ev2 = findmax(norm.(eigvecs_orth2))[2]
+        eigvecs_orth = [normalize(eigvecs_orth1[idx_ev1]) normalize(eigvecs_orth2[idx_ev2])]
+        return eigvals, eigvecs_orth
+    end
 end
 
 function shift_lambda_with_freq(lambda::Length, delta_omega::Frequency)

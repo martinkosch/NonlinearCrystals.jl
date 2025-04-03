@@ -42,9 +42,8 @@ end
 function PMType(
     principal_plane::Symbol,
     refr_data::PMRefractionData;
-    angle_tol::Angle=0.1u"°",
 )
-    o_or_e_rrb = Tuple(calc_o_or_e(principal_plane, E_dir; angle_tol) for E_dir in refr_data.E_dir_rrb)
+    o_or_e_rrb = Tuple(assign_o_or_e(principal_plane, E_dir) for E_dir in refr_data.E_dir_rrb)
 
     if o_or_e_rrb[3] === :e
         if o_or_e_rrb[1] === o_or_e_rrb[2] === :e # :e, :e, :e
@@ -89,10 +88,10 @@ function PMCollinearData(
 )
     if isa(cr, UnidirectionalCrystal)
         # o and e are valid classifiers for UnidirectionalCrystal even if propagating outside of the pricipal planes
-        pm_type = (PMType(:UD, refr_data; angle_tol), nothing)
+        pm_type = (PMType(:UD, refr_data), nothing)
     else
-        principal_planes = find_principal_planes(theta_pm, phi_pm)
-        pm_type = Tuple((isnothing(p) ? nothing : PMType(p, refr_data; angle_tol) for p in principal_planes))
+        principal_planes = find_principal_planes(theta_pm, phi_pm; angle_tol)
+        pm_type = Tuple((isnothing(p) ? nothing : PMType(p, refr_data) for p in principal_planes))
     end
 
     return PMCollinearData{typeof(cr)}(
@@ -211,84 +210,6 @@ function calc_unified_dir_signs(
     return (sign_r1, sign_r2, sign_b)
 end
 
-# function Base.show(io::IO, cpm::CollinearPhaseMatch)
-#     digits = 3
-
-#     @printf(io, "%-25s  %s\n", "Crystal:", cpm.cr.metadata[:description])
-
-#     # Scalar values
-#     @printf(io, "%-25s  θ: %6.3f°, ϕ: %6.3f°\n", "Angles:",
-#         ustrip(u"°", cpm.theta_pm), ustrip(u"°", cpm.phi_pm))
-
-#     @printf(io, "%-25s  %6.1f K (%5.2f °C)\n", "Temperature:",
-#         ustrip(u"K", cpm.temp), ustrip(u"°C", cpm.temp))
-
-#     @printf(io, "%-25s  %10.3f pm/V\n", "d_eff:",
-#         ustrip(u"pm/V", round(u"pm/V", cpm.eff_data.d_eff; digits)))
-
-#     @printf(io, "%-25s  %-25s W\n", "S₀ × L²:",
-#         auto_fmt(ustrip(u"W", round(u"W", cpm.eff_data.S0_Lsquared; sigdigits=digits))))
-
-#     println(io, "────────────────────────────────────────────────────────────")
-#     @printf(io, "%-25s  %-25s  %-25s  %-25s\n", "Quantity (unit)", "λ_r1", "λ_r2", "λ_b")
-#     println(io, "────────────────────────────────────────────────────────────")
-
-#     # Wavelengths (nm)
-#     λs = ustrip.(u"nm", round.(u"nm", cpm.lambda_rrb; digits))
-#     @printf(io, "%-25s  %10.3f  %10.3f  %10.3f\n", "Wavelength (nm):", λs...)
-
-#     # Polarization types
-#     types = cpm.pm_data.pm_type
-#     if isa(cpm.cr, UnidirectionalCrystal)
-#         polar_str = ["$(cpm.hi_or_lo_rrb[i])/$(types[1].o_or_e_rrb[i])" for i in 1:3]
-#         @printf(io, "%-25s  %-25s  %-25s  %-25s\n", "Type $(types[1].type) PM:", polar_str...)
-#     else
-#         @printf(io, "%-25s  %-25s  %-25s  %-25s\n", "Polarization:", cpm.hi_or_lo_rrb...)
-#         for t in types
-#             isnothing(t) && continue
-#             type_str = ["$(t.o_or_e_rrb[i])" for i in 1:3]
-#             @printf(io, "%-25s  %-25s  %-25s  %-25s\n", "Type $(t.type) PM in $(t.principal_plane) plane:", type_str...)
-#         end
-#     end
-
-#     # Walkoff (mrad)
-#     walkoffs = ustrip.(u"mrad", round.(u"mrad", cpm.walkoff_angle_rrb; digits))
-#     @printf(io, "%-25s  %10.3f  %10.3f  %10.3f\n", "Walkoff (mrad):", walkoffs...)
-
-#     # Indices
-#     n = round.(cpm.n_rrb; digits)
-#     ng = round.(cpm.group_index_rrb; digits)
-#     @printf(io, "%-25s  %10.3f  %10.3f  %10.3f\n", "Phase velocity / c₀:", n...)
-#     @printf(io, "%-25s  %10.3f  %10.3f  %10.3f\n", "Group velocity / c₀::", ng...)
-
-#     # GDD & TOD (fs²/mm, fs³/mm)
-#     gdd = ustrip.(u"fs^2/mm", round.(u"fs^2/mm", cpm.beta2_rrb; digits))
-#     tod = ustrip.(u"fs^3/mm", round.(u"fs^3/mm", cpm.beta3_rrb; digits))
-#     @printf(io, "%-25s  %10.3f  %10.3f  %10.3f\n", "GDD (fs²/mm):", gdd...)
-#     @printf(io, "%-25s  %10.3f  %10.3f  %10.3f\n", "TOD (fs³/mm):", tod...)
-
-#     # E_dir and D_dir
-#     e_dirs = ["[" * join(round.(v; digits), ", ") * "]" for v in cpm.E_dir_rrb]
-#     d_dirs = ["[" * join(round.(v; digits), ", ") * "]" for v in cpm.D_dir_rrb]
-#     @printf(io, "%-25s  %-25s  %-25s  %-25s\n", "E_dir:", e_dirs...)
-#     @printf(io, "%-25s  %-25s  %-25s  %-25s\n", "D_dir:", d_dirs...)
-
-#     # Bandwidths
-#     bw = auto_fmt.(ustrip.(u"GHz*cm", round.(u"GHz*cm", cpm.bw_data.lambda_L_bw; digits)))
-#     @printf(io, "%-25s  %-25s  %-25s  %-25s\n", "ω BW × L (GHz·cm):", bw...)
-
-#     @printf(io, "%-25s  %-25s\n", "T BW × L (K·cm):",
-#         auto_fmt(ustrip(u"K*cm", round(u"K*cm", cpm.bw_data.temp_L_bw; digits))))
-
-#     @printf(io, "%-25s  %-25s\n", "θ BW × L (mrad·cm):",
-#         auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", cpm.bw_data.theta_L_bw; digits))))
-
-#     @printf(io, "%-25s  %-25s\n", "ϕ BW × L (mrad·cm):",
-#         auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", cpm.bw_data.phi_L_bw; digits))))
-
-#     println(io, "────────────────────────────────────────────────────────────")
-# end
-
 function Base.show(io::IO, cpm::CollinearPhaseMatch)
     digits = 3
 
@@ -312,26 +233,26 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     # Polarization types
     if isa(cpm.cr, UnidirectionalCrystal)
         types = cpm.pm_data.pm_type
-        polar_str = ["$(cpm.hi_or_lo_rrb[i])/$(types[1].o_or_e_rrb[i])" for i in 1:3]
+        polar_str = ["$(cpm.hi_or_lo_rrb[i]) ($(types[1].o_or_e_rrb[i]))" for i in 1:3]
         @printf(io, "%-29s %-25s %-25s %-25s\n", "Type $(types[1].type) PM:", polar_str...)
     else
-        @printf(io, "%-29s %-25s %-25s %-25s\n", "Polarization:", cpm.hi_or_lo_rrb...)
+        @printf(io, "%-29s %-25s %-25s %-25s\n", "Refractive index type:", cpm.hi_or_lo_rrb...)
         for t in cpm.pm_data.pm_type
             isnothing(t) && continue
             pols = ["$(t.o_or_e_rrb[i])" for i in 1:3]
             @printf(io, "%-29s %-25s %-25s %-25s\n", "Type $(t.type) PM in $(t.principal_plane) plane:", pols...)
         end
     end
+    
+    # Index summary
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "Phase velocity / c₀:",
+    auto_fmt.(cpm.n_rrb; digits)...)
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "Group velocity / c₀:",
+    auto_fmt.(cpm.group_index_rrb; digits)...)
 
     # Walkoff
     w = auto_fmt.(ustrip.(u"mrad", cpm.walkoff_angle_rrb); digits)
     @printf(io, "%-29s %-25s %-25s %-25s\n", "Walkoff angle (mrad):", w...)
-
-    # Index summary
-    @printf(io, "%-29s %-25s %-25s %-25s\n", "Phase velocity / c₀:",
-        auto_fmt.(cpm.n_rrb; digits)...)
-    @printf(io, "%-29s %-25s %-25s %-25s\n", "Group velocity / c₀:",
-        auto_fmt.(cpm.group_index_rrb; digits)...)
 
     # Directions
     @printf(io, "%-29s %-25s %-25s %-25s\n", "S direction:", vec_str.(cpm.S_dir_rrb)...)

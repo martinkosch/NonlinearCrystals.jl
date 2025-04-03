@@ -74,7 +74,7 @@ function angles_to_vector(theta::Angle, phi::Angle)
     return @SVector [x, y, z]
 end
 
-function find_principal_planes(theta::Angle, phi::Angle; tol::Angle = 0.1u"°")
+function find_principal_planes(theta::Angle, phi::Angle; angle_tol::Angle = 0.1u"°")
     v = angles_to_vector(theta, phi)
 
     plane_syms = [:YZ, :XZ, :XY]
@@ -89,7 +89,7 @@ function find_principal_planes(theta::Angle, phi::Angle; tol::Angle = 0.1u"°")
     count = 0
     for (sym, normal) in zip(plane_syms, plane_normals)
         angle = acos(abs(clamp(dot(v, normal), -1, 1))) |> u"rad"
-        if abs(angle - π/2) ≤ tol
+        if abs(angle - π/2) ≤ angle_tol
             count += 1
             if count == 1
                 p1 = sym

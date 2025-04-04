@@ -1,4 +1,4 @@
-export PhaseMatch, CollinearPhaseMatch, pm_wavelengths, find_all_pms_along_dimension, find_nearest_pm_along_lambda_r_b, find_nearest_pm_along_theta_phi, delta_k
+export PhaseMatch, CollinearPhaseMatch, pm_wavelengths, find_all_pms_along_dimension, find_all_ncpm_over_temp, find_all_ncpm_over_lambda, find_nearest_pm_along_lambda_r_b, find_nearest_pm_along_theta_phi, delta_k
 
 struct PMRefractionData
     n_rrb::NTuple{3,Float64}
@@ -37,6 +37,15 @@ struct PMType
     principal_plane::Union{Symbol}
     o_or_e_rrb::NTuple{3,Symbol}
     type::String
+end
+
+function Base.show(io::IO, pmt::PMType)
+    if pmt.principal_plane === :UD
+        @printf(io, "%-32s %-3s %-3s %-3s\n", "Unidirectional type $(pmt.type) PM:", pmt.o_or_e_rrb...)
+    else
+        pols = ["$(pmt.o_or_e_rrb[i])" for i in 1:3]
+        @printf(io, "%-32s %-3s %-3s %-3s\n", "Bidirectional type $(pmt.type) PM in $(pmt.principal_plane) plane:", pols...)
+    end
 end
 
 function PMType(
@@ -227,8 +236,8 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     println(io, "────────────────────────────────────────────────────────────────────────────────────────────────────────")
 
     # Wavelengths
-    λs = ustrip.(u"µm", round.(u"µm", cpm.lambda_rrb; digits))
-    @printf(io, "%-29s %-25s %-25s %-25s\n", "Wavelength (µm):", λs...)
+    λs = ustrip.(u"nm", round.(u"nm", cpm.lambda_rrb; digits))
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "Wavelength (nm):", λs...)
 
     # Polarization types
     if isa(cpm.cr, UnidirectionalCrystal)
@@ -243,12 +252,12 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
             @printf(io, "%-29s %-25s %-25s %-25s\n", "Type $(t.type) PM in $(t.principal_plane) plane:", pols...)
         end
     end
-    
+
     # Index summary
     @printf(io, "%-29s %-25s %-25s %-25s\n", "Phase velocity / c₀:",
-    auto_fmt.(cpm.n_rrb; digits)...)
+        auto_fmt.(cpm.n_rrb; digits)...)
     @printf(io, "%-29s %-25s %-25s %-25s\n", "Group velocity / c₀:",
-    auto_fmt.(cpm.group_index_rrb; digits)...)
+        auto_fmt.(cpm.group_index_rrb; digits)...)
 
     # Walkoff
     w = auto_fmt.(ustrip.(u"mrad", cpm.walkoff_angle_rrb); digits)
@@ -585,6 +594,58 @@ function find_nearest_pm_along_lambda_r_b(
     return all_pm_candidates[i_nearest]
 end
 
+function find_all_ncpm_over_temp(
+    pol_rrb::NTuple{3,Symbol},
+    cr::NonlinearCrystal;
+    lambda_r1::Union{Nothing,Length}=nothing,
+    lambda_r2::Union{Nothing,Length}=nothing,
+    lambda_b::Union{Nothing,Length}=nothing,
+    temp_min::Temperature=default_temp(cr),
+    temp_max::Temperature=600u"K",
+    principal_axis::Union{AbstractVector{Symbol},Symbol,Nothing}=nothing,
+    ngrid=500,
+    tol=1e-14u"nm^-1",
+)
+    return find_all_pms_along_dimension(
+        pol_rrb,
+        cr;
+        lambda_r1_fixed=lambda_r1,
+        lambda_r2_fixed=lambda_r2,
+        lambda_b_fixed=lambda_b,
+        temp_min,
+        temp_max,
+        principal_axis,
+        ngrid,
+        tol,
+    )
+end
+
+function find_all_ncpm_over_lambda(
+    pol_rrb::NTuple{3,Symbol},
+    cr::NonlinearCrystal,
+    temp::Temperature=default_temp(cr);
+    lambda_r1::Union{Nothing,Length}=nothing,
+    lambda_r2::Union{Nothing,Length}=nothing,
+    lambda_b::Union{Nothing,Length}=nothing,
+    principal_axis::Union{AbstractVector{Symbol},Symbol,Nothing}=nothing,
+    ngrid=500,
+    tol=1e-14u"nm^-1",
+)
+    @assert count(isnothing.([lambda_r1, lambda_r2, lambda_b])) == 2 "Only one wavelength must be specified."
+    return find_all_pms_along_dimension(
+        pol_rrb,
+        cr;
+        lambda_r1_fixed=lambda_r1,
+        lambda_r2_fixed=lambda_r2,
+        lambda_b_fixed=lambda_b,
+        temp_min=temp,
+        temp_max=temp,
+        principal_axis,
+        ngrid,
+        tol,
+    )
+end
+
 function find_all_pms_along_dimension(
     pol_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
@@ -674,7 +735,7 @@ function _pms_vs_temperature(θ_ϕs, hi_or_lo_rrb, cr, λr1_fix, λr2_fix, λb_f
 
     for θ_ϕ in θ_ϕs
         temps = range(temp_min, temp_max, length=ngrid)
-        Δk = [delta_k(θ_ϕ..., hi_or_lo_rrb, cr; temp=T, lambda_r1=λr1, lambda_r2=λr2, lambda_b=λb) for T in temps]
+        Δk = [delta_k(θ_ϕ..., hi_or_lo_rrb, cr; temp, lambda_r1=λr1, lambda_r2=λr2, lambda_b=λb) for temp in temps]
 
         for i in 1:length(temps)-1
             if ustrip(Δk[i] * Δk[i+1]) < 0

@@ -175,7 +175,7 @@ function calc_d_eff(
     return d_eff
 end
 
-# function compute_miller_delta(
+# function calc_miller_delta(
 #     d_ref_XYZ::AbstractMatrix{<:Number},
 #     lambda_r1::Length,
 #     lambda_r2::Length,
@@ -729,9 +729,12 @@ function Base.show(io::IO, rd::RefractionData)
 end
 
 function print_refraction_data_header(io::IO, rd::Union{RefractionDataHiLo,RefractionData})
+    digits = 3
+
     @printf(io, "%-25s %s\n", "Crystal:", rd.cr.metadata[:description])
 
-    @printf(io, "%-25s %s\n", "Wavelength:", uconvert(u"µm", rd.lambda))
+    λ = ustrip.(u"nm", round.(u"nm", rd.lambda; digits))
+    @printf(io, "%-25s %s\n", "Wavelength (nm):", λ)
 
     @printf(io, "%-25s θ: %3.2f°, ϕ: %3.2f°\n", "k angles:",
         ustrip(u"°", rd.theta), ustrip(u"°", rd.phi))

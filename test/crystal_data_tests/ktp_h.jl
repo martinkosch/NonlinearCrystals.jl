@@ -47,12 +47,14 @@ pm2 = find_nearest_pm_along_theta_phi(63.2u"°", 90.0u"°", (:lo, :hi, :lo), KTP
 @test isapprox(pm2.theta_pm, 63.2u"°", atol=ustrip(u"rad", 4u"°"))
 @test isapprox(abs(pm2.eff_data.d_eff), 1.81u"pm/V", rtol=0.2) # From SNLO
 
+# Test sampled noncritical phasematches (from: Handbook of Nonlinear Crystals)
 pm3s = find_all_ncpm_over_lambda((:lo,:hi,:lo), KTP_H, 47u"°C"; lambda_b=0.4396u"µm", principal_axis=:X)
 @test length(pm3s) == 1
 pm3 = pm3s[1]
 @test all(isapprox(abs.(pm3.E_dir_rrb[1]), [0, 1, 0]))
 @test all(isapprox(abs.(pm3.E_dir_rrb[2]), [0, 0, 1]))
 @test all(isapprox(abs.(pm3.E_dir_rrb[3]), [0, 1, 0]))
+@test pm3.pm_type[1].type == pm3.pm_type[2].type == "II/III"
 @test isapprox(pm3.theta_pm, 90.0u"°", atol=ustrip(u"rad", 0.1u"°"))
 @test isapprox(pm3.phi_pm, 0.0u"°", atol=ustrip(u"rad", 0.1u"°"))
 @test isapprox(pm3.lambda_rrb[1], 1318.8u"nm", atol=50u"nm")
@@ -64,6 +66,7 @@ pm4 = pm4s[1]
 @test all(isapprox(abs.(pm4.E_dir_rrb[1]), [0, 1, 0]))
 @test all(isapprox(abs.(pm4.E_dir_rrb[2]), [0, 0, 1]))
 @test all(isapprox(abs.(pm4.E_dir_rrb[3]), [0, 1, 0]))
+@test pm4.pm_type[1].type == pm4.pm_type[2].type == "II/III"
 @test isapprox(pm4.theta_pm, 90.0u"°", atol=ustrip(u"rad", 0.1u"°"))
 @test isapprox(pm4.phi_pm, 0.0u"°", atol=ustrip(u"rad", 0.1u"°"))
 @test isapprox(pm4.lambda_rrb[1], 1338.0u"nm", atol=50u"nm")
@@ -75,6 +78,7 @@ pm5 = pm5s[1]
 @test all(isapprox(abs.(pm5.E_dir_rrb[1]), [1, 0, 0]))
 @test all(isapprox(abs.(pm5.E_dir_rrb[2]), [0, 0, 1]))
 @test all(isapprox(abs.(pm5.E_dir_rrb[3]), [1, 0, 0]))
+@test pm5.pm_type[1].type == pm5.pm_type[2].type == "II/III"
 @test isapprox(pm5.theta_pm, 90.0u"°", atol=ustrip(u"rad", 0.1u"°"))
 @test isapprox(pm5.phi_pm, 90.0u"°", atol=ustrip(u"rad", 0.1u"°"))
 @test isapprox(pm5.lambda_rrb[1], 994.3u"nm", atol=50u"nm")

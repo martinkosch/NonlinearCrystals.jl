@@ -267,31 +267,32 @@ end
 function assign_o_or_e(
     principal_plane::Symbol,
     E_dir::AbstractVector{<:Number};
+    angle_tol_ud::Angle=0.2u"°",
 )
-# For UnidirectionalCrystal, all waves with an E field perpendicular to the optical axis z are ordinary (:o)
-if principal_plane === :UD
-    z_vec = @SVector [0.0, 0.0, 1.0]
-    angle = acos(clamp(abs(dot(z_vec, E_dir)), -1, 1)) |> u"rad"
-    is_o = (angle - 90u"°") < 45u"°"
-else
-    # For BidirectionalCrystal, ordinary and extraordinary can only be assigned when propagating within the principal planes
-    if principal_plane === :YZ
-        plane_normal = @SVector [1.0, 0.0, 0.0]
-    elseif principal_plane === :XZ
+    # For UnidirectionalCrystal, all waves with an E field perpendicular to the optical axis z are ordinary (:o)
+    if principal_plane === :UD
+        z_vec = @SVector [0.0, 0.0, 1.0]
+        angle = acos(clamp(abs(dot(z_vec, E_dir)), -1, 1)) |> u"rad"
+        is_o = abs(angle - 90u"°") < angle_tol_ud # Use tolerance due to singularity when propagating close to the optical axis
+    else
+        # For BidirectionalCrystal, ordinary and extraordinary can only be assigned when propagating within the principal planes
+        if principal_plane === :YZ
+            plane_normal = @SVector [1.0, 0.0, 0.0]
+        elseif principal_plane === :XZ
             plane_normal = @SVector [0.0, 1.0, 0.0]
         elseif principal_plane === :XY
             plane_normal = @SVector [0.0, 0.0, 1.0]
         else
             @error "Principal plane '$(principal_plane)' unknown."
         end
-        
+
         angle = acos(clamp(abs(dot(plane_normal, E_dir)), -1, 1)) |> u"rad"
-        is_o = angle < 45u"°"
+        dir_error_str = "E_dir should be either within the plane or parallel to it for stable birefringent modes but it seems to be inbetween"
+        @assert (abs(angle - 90u"°") < 5u"°") || (abs(angle) < 5u"°") dir_error_str
+        is_o = abs(angle) < 45u"°"
     end
 
-    dir_error_str = "E_dir should be either within the plane or parallel to it for stable birefringent modes but it seems to be inbetween"
-    @assert ((angle - 90u"°") < 5u"°") || (angle < 5u"°") dir_error_str
-    
+
     return is_o ? (:o) : (:e)
 end
 

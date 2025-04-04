@@ -92,7 +92,7 @@ function plot_delta_k_heatmap(
         f[1, 1],
         xlabel="λ_b",
         ylabel="λ_r12",
-        title="$(cr.metadata[:description])\nΔk along positive $(principal_axis) axis, temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_rrb) # TODO: Add lambda names and o/e
+        title="$(cr.metadata[:description])\nΔk along positive $(principal_axis) axis, temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))", # , polarization directions: $(hi_or_lo_rrb) # TODO: Add lambda names and o/e
         dim1_conversion=uc,
         dim2_conversion=uc,
     )
@@ -300,7 +300,7 @@ function plot_noncritical_pms(
         f[1, 1],
         xlabel="λ_b",
         ylabel="λ_r12",
-        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))", # , polarization directions: $(hi_or_lo_rrb) # TODO: Add lambda names and o/e
+        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))", # , polarization directions: $(hi_or_lo_rrb) # TODO: Add lambda names and o/e
         dim1_conversion=uc,
         dim2_conversion=uc,
     )
@@ -467,7 +467,7 @@ function plot_polar_mode(
     size::NTuple{2,Int}=(800, 600),
 )
     f = Figure(; size)
-    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))"
+    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))"
     lambda_info = "$(round(u"nm", lambda_rrb[1]; digits)) (λ_r1, $(hi_or_lo_rrb[1])) + $(round(u"nm", lambda_rrb[2]; digits)) (λ_r2, $(hi_or_lo_rrb[2])) = $(round(u"nm", lambda_rrb[3]; digits)) (λ_b, $(hi_or_lo_rrb[3]))"
     ax = Axis(
         f[1, 1],
@@ -616,7 +616,7 @@ function plot_sphere_mode(
     size::NTuple{2,Int}=(800, 600),
 )
     f = Figure(; size)
-    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(float(temp |> u"K")) ($(float(temp |> u"°C")))"
+    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))"
     lambda_info = "$(round(u"nm", lambda_rrb[1]; digits)) (λ_r1, $(hi_or_lo_rrb[1])) + $(round(u"nm", lambda_rrb[2]; digits)) (λ_r2, $(hi_or_lo_rrb[2])) = $(round(u"nm", lambda_rrb[3]; digits)) (λ_b, $(hi_or_lo_rrb[3]))"
     ax = Axis3(
         f[1, 1],

@@ -38,3 +38,15 @@ end
 @safetestset "Crystal test: LBO" begin
     include("crystal_data_tests/lbo.jl")
 end
+
+@safetestset "Crystal test: LNB_C" begin
+    include("crystal_data_tests/lnb_c.jl")
+end
+
+# @safetestset "Crystal test: LNB_M" begin # TODO: Add when data is ready
+#     include("crystal_data_tests/lnb_m.jl")
+# end
+
+@safetestset "Crystal test: LNB_S" begin
+    include("crystal_data_tests/lnb_s.jl")
+end

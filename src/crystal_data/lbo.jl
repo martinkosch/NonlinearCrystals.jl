@@ -6,7 +6,6 @@ function create_lbo()
         :lattice_params => (8.447u"Å", 7.380u"Å", 5.120u"Å"),
         :density => 2.47u"g/cm^3",
         :mohs_hardness => 6,
-        :axes_assignment_XYZ => (:a, :c, :b),
     )
 
     # From: Handbook of Nonlinear Crystals and Kato, “Temperature-tuned 90º phase-matching properties of LiB3O5,” IEEE J. 1994
@@ -47,15 +46,26 @@ function create_lbo()
         temp_ref,
     )
 
-    rot_mat = rot_mat_abc_to_XYZ(metadata[:axes_assignment_XYZ])
+    rot_mat = rot_mat_crys_to_diel((:X, :Z, :Y))
     d_XYZ_full = calc_d_XYZ_full(metadata[:point_group], rot_mat; d31=-0.67u"pm/V", d32=0.85u"pm/V", d33=0.04u"pm/V")
     
+    miller_delta = calc_miller_delta(
+        d_XYZ_full, 
+        n_X_principal, 
+        n_Y_principal, 
+        n_Z_principal, 
+        temp_ref;  # TODO: This is a test/guess!
+        lambda_r1=800u"nm", # TODO: This is a test/guess!
+        lambda_r2=800u"nm", # TODO: This is a test/guess!
+    )
+
     LBO = BidirectionalCrystal(
         metadata,
         n_X_principal,
         n_Y_principal,
         n_Z_principal,
-        d_XYZ_full,
+        d_XYZ_full;
+        miller_delta,
     )
     return LBO
 end

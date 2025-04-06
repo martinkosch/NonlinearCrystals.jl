@@ -23,6 +23,10 @@ end
     include("crystal_data_tests/bbo.jl")
 end
 
+@safetestset "Crystal test: BIBO" begin
+    include("crystal_data_tests/bibo.jl")
+end
+
 @safetestset "Crystal test: CGA" begin
     include("crystal_data_tests/cga.jl")
 end

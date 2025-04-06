@@ -1,4 +1,4 @@
-export NonlinearCrystal, UnidirectionalCrystal, BidirectionalCrystal, default_lambda, default_temp, is_lambda_valid, valid_lambda_range, calc_d_XYZ_full, optical_axis_angle, RefractionDataHiLo, RefractionData, plot_birefringent_refraction, default_temp
+export NonlinearCrystal, UnidirectionalCrystal, BidirectionalCrystal, default_lambda, default_temp, is_lambda_valid, valid_lambda_range, optical_axis_angle, RefractionDataHiLo, RefractionData, plot_birefringent_refraction, default_temp
 
 abstract type NonlinearCrystal end
 
@@ -23,197 +23,29 @@ function valid_lambda_range(cr::NonlinearCrystal)
     return (min_valid_lambda, max_valid_lambda)
 end
 
-function tensor_indices(comp::Symbol)
-    s = string(comp)
-    length(s) == 3 && s[1] == 'd' || error("Invalid tensor component symbol: $comp")
-    i = parse(Int, s[2])
-    j = parse(Int, s[3])
-    (i, j)
-end
-
-# Expand 3x6 contracted tensor into full 3x3x3
-function expand_d_contract(d_contract::AbstractMatrix{<:Number})
-    d_full = zeros(eltype(d_contract), 3, 3, 3)
-    idx_map = [
-        (1, 1), (2, 2), (3, 3),  # J=1,2,3
-        (2, 3), (1, 3), (1, 2)   # J=4,5,6 (symmetric indices)
-    ]
-    for i in 1:3, J in 1:6
-        j, k = idx_map[J]
-        d_full[i, j, k] += d_contract[i, J]
-        if j != k
-            d_full[i, k, j] += d_contract[i, J]  # symmetry
-        end
-    end
-    return d_full
-end
-
-# Rotate 3x3x3 tensor
-function rotate_tensor3(d::AbstractArray{<:Number,3}, R::AbstractMatrix{<:Number})
-    @tullio d_rot[i_dash, j_dash, k_dash] := R[i_dash, i] * R[j_dash, j] * R[k_dash, k] * d[i, j, k]
-end
-
-# Contract back to 3x6
-function contract_d_tensor(d_full::AbstractArray{<:Number,3})
-    d_contract = zeros(eltype(d_full), 3, 6)
-    idx_map = [
-        (1, 1), (2, 2), (3, 3),
-        (2, 3), (1, 3), (1, 2)
-    ]
-    for i in 1:3, J in 1:6
-        j, k = idx_map[J]
-        if j == k
-            d_contract[i, J] = d_full[i, j, k]
-        else
-            d_contract[i, J] = 0.5 * (d_full[i, j, k] + d_full[i, k, j])
-        end
-    end
-    return d_contract
-end
-
-function rot_mat_abc_to_XYZ(axes_assignment_XYZ::NTuple{3,Symbol})
-    # Standard basis in XYZ
-    basis_vectors = Dict(
-        :X => [1.0, 0.0, 0.0],
-        :Y => [0.0, 1.0, 0.0],
-        :Z => [0.0, 0.0, 1.0]
-    )
-
-    # Create a::Vector, b::Vector, c::Vector based on XYZ assignment
-    # We want to know how a, b, c are expressed in XYZ
-    axis_order = [:a, :b, :c]
-    rot_mat = zeros(3, 3)
-    for (i, axis_sym) in enumerate(axis_order)
-        # Find which XYZ direction this axis is assigned to
-        idx_in_XYZ = findfirst(x -> x == axis_sym, axes_assignment_XYZ)
-        rot_mat[i, :] .= basis_vectors[[:X, :Y, :Z][idx_in_XYZ]]
-    end
-
-    return rot_mat
-end
-
-function calc_d_XYZ_full(
-    point_group::String,
-    rot_mat::AbstractMatrix{<:Number}=I(3),
-    use_kleinman::Bool=true;
-    components_abc...
-)
-    comps = [c[1] for c in components_abc]
-    vals = [c[2] for c in components_abc]
-    sg = use_kleinman ? SYMMETRY_GROUPS_KLEINMAN : SYMMETRY_GROUPS
-
-    symmetry = get(sg, point_group, nothing)
-    symmetry !== nothing || error("Point group '$point_group' not defined.")
-
-    # Iterate through each symmetry group to ensure consistency
-    # Symmetry goups and given components are assumed to be specified in abc coordinates
-    d_abc = zeros(3, 6) * u"pm/V"
-    for group in symmetry
-        group_comps, group_signs = group
-        given_group_comps = intersect(Set(group_comps), Set(comps))
-
-        if length(given_group_comps) > 1
-            @error "Exactly one of the following components must be specified: $(group_comps)"
-        elseif length(given_group_comps) < 1
-            if length(group_comps) == 1
-                @error "Component '$(group_comps[1])' must be specified."
-            else
-                @error "One of these components must be specified: $(group_comps)"
-            end
-        end
-
-        # Correct signs within the current symmetry group
-        given_group_comp = collect(given_group_comps)[1]
-        idx = findall(c -> (c === given_group_comp), group_comps)[1]
-        group_signs_switched = group_signs[idx] == 1 ? group_signs : -group_signs
-
-        # Set all group components based on the given component with the correct sign relations
-        c_idx = findall(c -> (c === given_group_comp), comps)[1]
-        for (gc, gs) in zip(group_comps, group_signs_switched)
-            d_abc[tensor_indices(gc)...] = vals[c_idx] * gs
-        end
-    end
-
-    # Rotate d tensor from the coordinates system of the given d tensor components to XYZ coordinates based on the provided assigment
-    d_abc_full = expand_d_contract(d_abc)
-    d_XYZ_full = rotate_tensor3(d_abc_full, rot_mat)
-    return d_XYZ_full
-end
-
-function calc_d_eff(
-    cr::NonlinearCrystal,
-    E_dir_r1::AbstractVector{<:Number},
-    E_dir_r2::AbstractVector{<:Number},
-    E_dir_b::AbstractVector{<:Number};
-    lambda_rrb::Union{AbstractVector{<:Length},Nothing}=nothing,
-    temp::Temperature=default_temp(cr),
-)
-    # If all lambdas are given, use Miller scaling
-    # if isnothing(lambda_rrb)
-    @tullio d_eff := E_dir_b[i] * cr.d_XYZ_ref_full[i, j, k] * E_dir_r1[j] * E_dir_r2[k]
-    # else
-    #     # Compute refractive indices along XYZ at given wavelengths and temperature
-    #     n_r1 = @SVector [
-    #         cr.n_X_principal(lambda_rrb[1], temp),
-    #         cr.n_Y_principal(lambda_rrb[1], temp),
-    #         cr.n_Z_principal(lambda_rrb[1], temp)
-    #     ]
-    #     n_r2 = @SVector [
-    #         cr.n_X_principal(lambda_rrb[2], temp),
-    #         cr.n_Y_principal(lambda_rrb[2], temp),
-    #         cr.n_Z_principal(lambda_rrb[2], temp)
-    #     ]
-    #     n_b = @SVector [
-    #         cr.n_X_principal(lambda_rrb[3], temp),
-    #         cr.n_Y_principal(lambda_rrb[3], temp),
-    #         cr.n_Z_principal(lambda_rrb[3], temp)
-    #     ]
-
-    #     # Use Miller-scaled d_XYZ tensor to calculate d_eff
-    #     @tullio d_eff := E_dir_b[i] * cr.miller_delta[i, j, k] * n_r1[i] * n_r2[j] * n_b[k] * E_dir_r1[j] * E_dir_r2[k]
-    # end
-    return d_eff
-end
-
-# function calc_miller_delta(
-#     d_ref_XYZ::AbstractMatrix{<:Number},
-#     lambda_r1::Length,
-#     lambda_r2::Length,
-#     lambda_b::Length,
-#     temp::Temperature,
-#     n_X_principal::RefractiveIndex,
-#     n_Y_principal::RefractiveIndex,
-#     n_Z_principal::RefractiveIndex,
-# )
-#     @assert size(d_ref_XYZ) == (3, 6)
-#     d_ref_XYZ_expanded = expand_d_contract(d_ref_XYZ)
-
-#     n_r1 = @SVector [n_X_principal(lambda_r1, temp), n_Y_principal(lambda_r1, temp), n_Z_principal(lambda_r1, temp)]
-#     n_r2 = @SVector [n_X_principal(lambda_r2, temp), n_Y_principal(lambda_r2, temp), n_Z_principal(lambda_r2, temp)]
-#     n_b = @SVector [n_X_principal(lambda_b, temp), n_Y_principal(lambda_b, temp), n_Z_principal(lambda_b, temp)]
-
-#     @tullio miller_delta[i, j, k] := d_ref_XYZ_expanded[i, j, k] / (n_r1[i] * n_r2[j] * n_b[k])
-
-#     return miller_delta
-# end
-
 ## Unidirectional crystal
 
-struct UnidirectionalCrystal{TM,TE,TO,TD} <: NonlinearCrystal
+struct UnidirectionalCrystal{TM<:Dict,TE<:RefractiveIndex,TO<:RefractiveIndex} <: NonlinearCrystal
     metadata::TM
     n_XY_principal::TE
     n_Z_principal::TO
-    d_XYZ_ref_full::SArray{Tuple{3,3,3},TD}
+    d_XYZ_ref_full::SArray{Tuple{3,3,3},typeof(1.0u"m/V")}
+    miller_delta::Union{Nothing,SArray{Tuple{3,3,3},typeof(1.0u"m/V")}}
 
     function UnidirectionalCrystal(
         metadata::Dict,
         n_o_principal::RefractiveIndex,
         n_e_principal::RefractiveIndex,
         d_XYZ_ref_full::AbstractArray{<:Number,3};
+        miller_delta::Union{Nothing,AbstractArray{<:Number,3}}=nothing,
     )
         @assert haskey(metadata, :point_group) && haskey(POINT_GROUP_MAP, metadata[:point_group]) "Point group unknown or not specified in metadata. Possible values are:\n$(keys(NonlinearCrystals.POINT_GROUP_MAP))"
-        return new{typeof(metadata),typeof(n_o_principal),typeof(n_e_principal),eltype(d_XYZ_ref_full)}(
-            metadata, n_o_principal, n_e_principal, SArray{Tuple{3,3,3},eltype(d_XYZ_ref_full)}(d_XYZ_ref_full)
+        return new{typeof(metadata),typeof(n_o_principal),typeof(n_e_principal)}(
+            metadata,
+            n_o_principal,
+            n_e_principal,
+            d_XYZ_ref_full,
+            miller_delta,
         )
     end
 end
@@ -231,13 +63,13 @@ function Base.getproperty(cr::UnidirectionalCrystal, sym::Symbol)
 end
 
 ## Bidirectional crystal
-
-struct BidirectionalCrystal{TM,TX,TY,TZ,TD} <: NonlinearCrystal
+struct BidirectionalCrystal{TM<:Dict,TX<:RefractiveIndex,TY<:RefractiveIndex,TZ<:RefractiveIndex} <: NonlinearCrystal
     metadata::TM
     n_X_principal::TX
     n_Y_principal::TY
     n_Z_principal::TZ
-    d_XYZ_ref_full::SArray{Tuple{3,3,3},TD}
+    d_XYZ_ref_full::SArray{Tuple{3,3,3},typeof(1.0u"m/V")}
+    miller_delta::Union{Nothing,SArray{Tuple{3,3,3},typeof(1.0u"m/V")}}
 
     function BidirectionalCrystal(
         metadata::Dict,
@@ -245,13 +77,19 @@ struct BidirectionalCrystal{TM,TX,TY,TZ,TD} <: NonlinearCrystal
         n_Y_principal::RefractiveIndex,
         n_Z_principal::RefractiveIndex,
         d_XYZ_ref_full::AbstractArray{<:Number,3};
+        miller_delta::Union{Nothing,AbstractArray{<:Number,3}}=nothing,
         warn_n_Z_smaller_n_X::Bool=true,
     )
         @assert haskey(metadata, :point_group) && haskey(POINT_GROUP_MAP, metadata[:point_group]) "Point group unknown or not specified in metadata. Possible values are:\n$(keys(NonlinearCrystals.POINT_GROUP_MAP))"
         warnstring = "n_Z_principal ≥ n_Y_principal ≥ n_X_principal should be used in this package for biaxial crystals$(haskey(metadata, :description) ? " but this is not fulfilled for crystal '$(metadata[:description])'." : ".")"
         warn_n_Z_smaller_n_X && (n_Z_principal() < n_Y_principal() < n_X_principal()) && (@warn warnstring)
-        return new{typeof(metadata),typeof(n_X_principal),typeof(n_Y_principal),typeof(n_Z_principal),eltype(d_XYZ_ref_full)}(
-            metadata, n_X_principal, n_Y_principal, n_Z_principal, SArray{Tuple{3,3,3},eltype(d_XYZ_ref_full)}(d_XYZ_ref_full)
+        return new{typeof(metadata),typeof(n_X_principal),typeof(n_Y_principal),typeof(n_Z_principal)}(
+            metadata,
+            n_X_principal,
+            n_Y_principal,
+            n_Z_principal,
+            d_XYZ_ref_full,
+            miller_delta,
         )
     end
 end

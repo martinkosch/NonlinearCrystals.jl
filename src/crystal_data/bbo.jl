@@ -49,11 +49,21 @@ function create_bbo()
 
     d_XYZ_full = calc_d_XYZ_full(metadata[:point_group]; d22=-2.2u"pm/V", d15=0.08u"pm/V", d33=0.0u"pm/V") # TODO: Entry d33 is possibly not right!
 
+    miller_delta = calc_miller_delta(
+        d_XYZ_full, 
+        n_o_principal, 
+        n_e_principal, 
+        temp_ref;  # TODO: This is a test/guess!
+        lambda_r1=800u"nm", # TODO: This is a test/guess!
+        lambda_r2=800u"nm", # TODO: This is a test/guess!
+    )
+
     BBO = UnidirectionalCrystal(
         metadata,
         n_o_principal,
         n_e_principal,
-        d_XYZ_full,
+        d_XYZ_full;
+        miller_delta,
     )
     return BBO
 end

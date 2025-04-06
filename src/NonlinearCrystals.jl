@@ -27,12 +27,14 @@ COLORMAP_HEATMAP = :vik
 include("utils.jl")
 include("refractive_index.jl")
 include("crystals.jl")
+include("d_tensor.jl")
 include("crystal_symmetry.jl")
 include("phasematch.jl")
 include("plot_phasematch.jl")
 
 # Include all crystals
 include("crystal_data/bbo.jl")
+include("crystal_data/bibo.jl")
 include("crystal_data/cga.jl")
 include("crystal_data/ktp_h.jl")
 include("crystal_data/ktp_f.jl")

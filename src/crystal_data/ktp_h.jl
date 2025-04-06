@@ -6,7 +6,6 @@ function create_ktp_h()
         :lattice_params => (6.404u"Å", 10.616u"Å", 12.814u"Å"),
         :density => 2.945u"g/cm^3",
         :mohs_hardness => 5,
-        :axes_assignment_XYZ => (:a, :b, :c)
     )
 
     # From: Handbook of Nonlinear Crystals
@@ -46,13 +45,23 @@ function create_ktp_h()
 
     d_XYZ_full = calc_d_XYZ_full(metadata[:point_group]; d31=1.95u"pm/V", d32=3.9u"pm/V", d33=15.3u"pm/V")
 
+    miller_delta = calc_miller_delta(
+        d_XYZ_full, 
+        n_X_principal, 
+        n_Y_principal, 
+        n_Z_principal, 
+        temp_ref;  # TODO: This is a test/guess!
+        lambda_r1=800u"nm", # TODO: This is a test/guess!
+        lambda_r2=800u"nm", # TODO: This is a test/guess!
+    )
 
     KTP_H = BidirectionalCrystal(
         metadata,
         n_X_principal,
         n_Y_principal,
         n_Z_principal,
-        d_XYZ_full,
+        d_XYZ_full;
+        miller_delta,
     )
     return KTP_H
 end

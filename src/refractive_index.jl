@@ -86,20 +86,20 @@ function dn_dtemp(ri::RefractiveIndex, lambda::Length=default_lambda(ri), temp::
 end
 
 
-struct SellmeierFunction{FL,LR,TF,TR} <: RefractiveIndex
+struct SellmeierFunction{FL} <: RefractiveIndex
     n_fun::FL
-    lambda_range::LR
-    temp_ref::TF
-    temp_range::TR
+    lambda_range::NTuple{2,typeof(1.0u"m")}
+    temp_ref::typeof(1.0u"K")
+    temp_range::Union{Nothing,NTuple{2,typeof(1.0u"K")}}
 
     function SellmeierFunction(
         n_fun::Function,
-        lambda_range::Union{Nothing,Tuple{Unitful.Length,Unitful.Length}}=nothing;
+        lambda_range::Union{Nothing,NTuple{2,Length}}=nothing;
         temp_ref=293.15u"K",
-        temp_range::Union{Nothing,Tuple{Unitful.Temperature,Unitful.Temperature}}=nothing,
+        temp_range::Union{Nothing,NTuple{2,Temperature}}=nothing,
     )
         temp_ref = temp_ref |> u"K"
-        return new{eltype(n_fun),typeof(lambda_range),typeof(temp_ref),typeof(temp_range)}(
+        return new{typeof(n_fun)}(
             n_fun,
             lambda_range,
             temp_ref,

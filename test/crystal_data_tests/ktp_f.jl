@@ -58,7 +58,7 @@ pm3 = find_nearest_pm_along_theta_phi(57.95u"°", 90.0u"°", (:lo, :hi, :lo), KT
 @test pm3.pm_type[1].principal_plane == :YZ
 @test isnothing(pm3.pm_type[2])
 @test isapprox(pm3.theta_pm, 57.95u"°", atol=ustrip(u"rad", 4u"°"))
-@test isapprox(abs(pm3.eff_data.d_eff), 1.29u"pm/V", rtol=0.3) # From SNLO
+@test isapprox(abs(pm3.eff_data.d_eff), 1.29u"pm/V", rtol=0.3) # From SNLO 
 
 pm4 = find_nearest_pm_along_theta_phi(56.22u"°", 90.0u"°", (:lo, :hi, :lo), KTP_F; lambda_r1=1.2u"µm", lambda_b=1.2u"µm" / 2, temp=293u"K")
 @test all(pm4.pm_type[1].o_or_e_rrb .== (:o, :e, :o))

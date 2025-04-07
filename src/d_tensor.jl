@@ -1,4 +1,4 @@
-export calc_d_XYZ_full, rot_mat_crys_to_diel, plot_axes_assignment_crys_to_diel
+export calc_d_XYZ_full, rot_mat_crys_to_diel, plot_axes_assignment_crys_to_diel, calc_miller_delta
 
 """
     expand_voigt_index(i::Integer, l::Integer) -> Vector{NTuple{3,Int}}
@@ -132,8 +132,7 @@ function rot_mat_crys_to_diel(
 
     # Step 2: Apply rotation around dielectric axis after mapping
     if rotate_about !== nothing && phi != 0.0
-        c = cos(phi)
-        s = sin(phi)
+        s, c = sincos(phi)
         if rotate_about == :X
             Rϕ = [
                 1.0 0.0 0.0;
@@ -257,30 +256,63 @@ function calc_d_eff(
     lambda_rrb::Union{NTuple{3,Length},Nothing}=nothing,
     temp::Temperature=default_temp(cr),
 )
-    # If all lambdas are given, use Miller scaling
+    # Use Miller scaling if all lambdas are given and Miller's delta has been calculated during crystal initialization
     if isnothing(cr.miller_delta) || isnothing(lambda_rrb)
         d_XYZ_full = cr.d_XYZ_ref_full
     else
-        # Compute refractive indices along XYZ at given wavelengths and temperature
-        # Compute χ1 = n² - 1 values at reference measurement wavelengths
-        n_funs = (cr.n_X_principal, cr.n_Y_principal, cr.n_Z_principal)
-        n_r1 = (f(lambda_rrb[1], temp) for f in n_funs)
-        n_r2 = (f(lambda_rrb[2], temp) for f in n_funs)
-        n_b = (f(lambda_rrb[3], temp) for f in n_funs)
-
-        χ1_r1 = n_r1 .^ 2 .- 1
-        χ1_r2 = n_r2 .^ 2 .- 1
-        χ1_b = n_b .^ 2 .- 1
-
-        # Miller’s Rule:
-        # χ⁽²⁾ᵢⱼₖ = Δᵢⱼₖ · χ⁽¹⁾ᵢᵢ(ω_b) · χ⁽¹⁾ⱼⱼ(ω_r₁) · χ⁽¹⁾ₖₖ(ω_r₂)
-        # where χ⁽¹⁾ₐₐ(ω) = nₐ²(ω) − 1 and dᵢⱼₖ = 0.5 χ⁽²⁾ᵢⱼₖ
-        @tullio χ2[i, j, k] := cr.miller_delta[i, j, k] * (χ1_b[i] * χ1_r1[j] * χ1_r2[k])
-        d_XYZ_full = χ2 / 2
+        d_XYZ_full = miller_rescale(cr, lambda_rrb; temp)
     end
 
     @tullio d_eff := E_dir_b[i] * d_XYZ_full[i, j, k] * E_dir_r1[j] * E_dir_r2[k]
     return d_eff
+end
+
+function miller_rescale(
+    cr::NonlinearCrystal,
+    lambda_rrb::Union{NTuple{3,Length},Nothing};
+    temp::Temperature=default_temp(cr),
+)
+    d_XYZ_full = miller_rescale(
+        cr.miller_delta,
+        cr.n_X_principal,
+        cr.n_Y_principal,
+        cr.n_Z_principal,
+        temp;
+        lambda_r1=lambda_rrb[1],
+        lambda_r2=lambda_rrb[2],
+        lambda_b=lambda_rrb[3],
+    )
+    return d_XYZ_full
+end
+
+function miller_rescale(
+    miller_delta::AbstractArray{<:Number,3},
+    n_X_principal::RefractiveIndex,
+    n_Y_principal::RefractiveIndex,
+    n_Z_principal::RefractiveIndex,
+    temp::Temperature;
+    lambda_r1::Union{Length,Nothing}=nothing,
+    lambda_r2::Union{Length,Nothing}=nothing,
+    lambda_b::Union{Length,Nothing}=nothing,
+)
+    lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
+
+    # Compute refractive indices along XYZ at given wavelengths and temperature
+    # Compute χ1 = n² - 1 values at reference measurement wavelengths
+    n_funs = (n_X_principal, n_Y_principal, n_Z_principal)
+    n_r1 = (f(lambda_r1, temp) for f in n_funs)
+    n_r2 = (f(lambda_r2, temp) for f in n_funs)
+    n_b = (f(lambda_b, temp) for f in n_funs)
+
+    χ1_r1 = n_r1 .^ 2 .- 1
+    χ1_r2 = n_r2 .^ 2 .- 1
+    χ1_b = n_b .^ 2 .- 1
+
+    # Miller’s Rule:
+    # χ⁽²⁾ᵢⱼₖ = Δᵢⱼₖ · χ⁽¹⁾ᵢᵢ(ω_b) · χ⁽¹⁾ⱼⱼ(ω_r₁) · χ⁽¹⁾ₖₖ(ω_r₂)
+    # where χ⁽¹⁾ₐₐ(ω) = nₐ²(ω) − 1
+    @tullio d_XYZ_full[i, j, k] := miller_delta[i, j, k] * (χ1_b[i] * χ1_r1[j] * χ1_r2[k])
+    return d_XYZ_full
 end
 
 function calc_miller_delta(
@@ -295,20 +327,19 @@ function calc_miller_delta(
 )
     lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
 
-    n_r1 = @SVector [n_X_principal(lambda_r1, temp_ref), n_Y_principal(lambda_r1, temp_ref), n_Z_principal(lambda_r1, temp_ref)]
-    n_r2 = @SVector [n_X_principal(lambda_r2, temp_ref), n_Y_principal(lambda_r2, temp_ref), n_Z_principal(lambda_r2, temp_ref)]
-    n_b = @SVector [n_X_principal(lambda_b, temp_ref), n_Y_principal(lambda_b, temp_ref), n_Z_principal(lambda_b, temp_ref)]
+    n_funs = (n_X_principal, n_Y_principal, n_Z_principal)
+    n_r1 = (f(lambda_r1, temp_ref) for f in n_funs)
+    n_r2 = (f(lambda_r2, temp_ref) for f in n_funs)
+    n_b = (f(lambda_b, temp_ref) for f in n_funs)
 
     χ1_r1 = n_r1 .^ 2 .- 1
     χ1_r2 = n_r2 .^ 2 .- 1
     χ1_b = n_b .^ 2 .- 1
-    χ2 = 2 * d_ref_XYZ_full
 
     # Miller’s Rule:
     # Δᵢⱼₖ = χ⁽²⁾ᵢⱼₖ / (χ⁽¹⁾ᵢᵢ(ω_b) · χ⁽¹⁾ⱼⱼ(ω_r₁) · χ⁽¹⁾ₖₖ(ω_r₂))
-    # χ⁽²⁾ᵢⱼₖ = 2 dᵢⱼₖ
     # χ⁽¹⁾ₐₐ(ω) = nₐ²(ω) − 1
-    @tullio miller_delta[i, j, k] := χ2[i, j, k] / (χ1_b[i] * χ1_r1[j] * χ1_r2[k])
+    @tullio miller_delta[i, j, k] := d_ref_XYZ_full[i, j, k] / (χ1_b[i] * χ1_r1[j] * χ1_r2[k])
 
     return SArray{Tuple{3,3,3},typeof(1.0u"m/V")}(miller_delta)
 end
@@ -338,62 +369,33 @@ function calc_miller_delta(
     )
 end
 
+function plot_miller_scaling_coeffs_shg(
+    cr::NonlinearCrystal;
+    temp::Temperature=default_temp(cr),
+    size::NTuple{2,Int}=(800, 600),
+)
+    lambda_b_start = valid_lambda_range(cr)[1]
+    lambda_b_end = valid_lambda_range(cr)[2] / 2
+    all_lambda_b = LinRange(lambda_b_start:1.0u"nm":lambda_b_end)
+    get_all_d = l -> abs.(miller_rescale(cr, (2 * l, 2 * l, l); temp))
+    all_d = [contract_d_tensor(get_all_d(l)) for l in all_lambda_b]
 
-# abstract type dComponent end
-
-# struct dComponentMiller <: dComponent
-#     ref_val::typeof(1.0u"m/V")
-#     ref_lambda_rrb::NTuple{3,typeof(1.0u"m")}
-#     ref_temp::typeof(1.0u"K")
-# end
-
-# struct dComponentConstant <: dComponent
-#     ref_val::typeof(1.0u"m/V")
-# end
-
-# # NonlinearCrystals.dComponent(2.6u"pm/V", (1313u"nm", 1313u"nm", 1313u"nm" / 2), 293u"K")
-# # NonlinearCrystals.miller_delta((1,5), d, KTP_F) == 0.26u"pm/V"
-
-# # NonlinearCrystals.dComponent(3.7e-12 m V^-1, (1.064e-6 m, 1.064e-6 m, 5.32e-7 m), 293.0 K)
-# # NonlinearCrystals.miller_delta((1,5), d, KTP_F) == 0.35u"pm/V"
-
-# # NonlinearCrystals.dComponent(3.9u"pm/V", (852u"nm", 852u"nm", 852u"nm" / 2), 293u"K")
-# # NonlinearCrystals.miller_delta((1,5), d, KTP_F) == 0.34u"pm/V"
-
-# # I. Shoji et al., Absolute scale of second-order nonlinear-optical coefficients, 1997
-# function miller_delta(index::Ntuple{2,Integer}, d::dComponentMiller, cr::NonlinearCrystal)
-#     λ_r1, λ_r2, λ_b = d.ref_lambda_rrb
-#     T = d.ref_temp
-#     i_voigt, l_voigt = index
-
-#     # Get full (i,j,k) combinations from Voigt mapping
-#     ijk_list = expand_voigt_index(i_voigt, l_voigt)
-
-#     # Compute χ1 = n² - 1 values at reference measurement wavelengths
-#     n_funs = (cr.n_X_principal, cr.n_Y_principal, cr.n_Z_principal)
-#     n_r1 = (f(λ_r1, T) for f in n_funs)
-#     n_r2 = (f(λ_r2, T) for f in n_funs)
-#     n_b = (f(λ_b, T) for f in n_funs)
-
-#     χ1_r1 = n_r1 .^ 2 .- 1
-#     χ1_r2 = n_r2 .^ 2 .- 1
-#     χ1_b = n_b .^ 2 .- 1
-
-#     # Average over all (i,j,k) mappings from the Voigt index
-#     Δ_total = mapreduce(+, ijk_list) do (i, j, k)
-#         return d.ref_val / (χ1_b[i] * χ1_r1[j] * χ1_r2[k])
-#     end
-
-#     miller_delta = Δ_total / length(ijk_list)
-#     return miller_delta
-# end
-
-# function miller_scale(d::dComponent)
-#     d_scaled = d.ref_val
-#     return d_scaled
-# end
-
-# function no_scale(d::dComponent)
-#     d_scaled = d.ref_val
-#     return d_scaled
-# end
+    f = Figure(; size)
+    uc1 = Makie.UnitfulConversion(u"µm"; units_in_label=true)
+    uc2 = Makie.UnitfulConversion(u"pm/V"; units_in_label=true)
+    ax = Axis(
+        f[1, 1],
+        xlabel="λ_b",
+        ylabel="d_ij",
+        dim1_conversion=uc1,
+        dim2_conversion=uc2,
+    )
+    for i in CartesianIndices(all_d[1])
+        all_d[1][i] == 0.0u"pm/V" && continue
+        lab = (plot, index, position) -> "λ_b = $(round(u"µm", position[1] * u"µm"; digits=3))\nd$(i[1])$(i[2]) = $(round(u"pm/V", position[2] * u"pm/V"; digits=3))"
+        lines!(ax, all_lambda_b, [d[i] for d in all_d], label="d$(i[1])$(i[2])", inspectable=true, inspector_label=lab)
+    end
+    DataInspector(ax)
+    Legend(f[1, 2], ax)
+    return f
+end

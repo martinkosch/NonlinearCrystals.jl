@@ -351,10 +351,6 @@ function plot_delta_k_map(
     # Prepare data
     lambda_rrb = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
 
-    if isnothing(temp)
-        temp = isa(cr, UnidirectionalCrystal) ? cr.n_o_principal.temp_ref : cr.n_X_principal.temp_ref
-    end
-
     θ_range, ϕ_range, all_delta_k = compute_delta_k_grid(cr, hi_or_lo_rrb, lambda_rrb..., temp, n_points)
     scale_limit = maximum(abs.(all_delta_k))
 
@@ -433,7 +429,7 @@ function compute_delta_k_grid(
     θ_range = LinRange(0, π, n_points) * u"rad"
     ϕ_range = LinRange(0, 2π, 2 * n_points) * u"rad"
 
-    # TODO: Use symmetry information from cr.metadata[:point_group] for speedup
+    # TODO: Use symmetry information for speedup
     if isa(cr, UnidirectionalCrystal)
         # No ϕ dependence, compute only one value and repeat
         all_delta_k = [

@@ -636,8 +636,8 @@ function plot_refractiveindex(
     f = Figure()
     ax = Axis(f[1, 1], xlabel="Wavelength", ylabel="Refractive index")
 
-    plot_refractiveindex!(cr.n_XY_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_X/n_Y (e)", colormap=Reverse(:Reds))
-    plot_refractiveindex!(cr.n_Z_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_Z (o)", colormap=Reverse(:Blues))
+    plot_refractiveindex!(cr.n_XY_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_X/n_Y (o)", colormap=Reverse(:Reds))
+    plot_refractiveindex!(cr.n_Z_principal; n_sample_pts, temp, lambda_min, lambda_max, label="n_Z (e)", colormap=Reverse(:Blues))
     Legend(f[1, 2], ax)
     DataInspector(ax)
     return f

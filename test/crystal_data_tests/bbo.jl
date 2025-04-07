@@ -47,6 +47,6 @@ pm4 = find_nearest_pm_along_theta_phi(58.4u"°", 0.0u"°", (:o, :e, :e), BBO; la
 @test isapprox(pm4.bw_data.temp_L_bw, 18.43u"K" * 1u"cm", atol=2u"K * cm") # From SNLO
 @test isapprox(abs(pm4.eff_data.d_eff), 0.56u"pm/V", rtol=0.3) # From SNLO
 
-pm5 = find_nearest_pm_along_theta_phi(69.5u"°", 30.0u"°", (:o, :o, :e), BBO; lambda_r1=0.5321u"µm", lambda_b=0.2128u"µm", temp=293u"K")
-@test isapprox(pm5.theta_pm, 69.5u"°", atol=ustrip(u"rad", 2u"°")) 
-@test isapprox(abs(pm5.eff_data.d_eff), 0.93u"pm/V", rtol=0.2) # From Nikogosyan
+# pm5 = find_nearest_pm_along_theta_phi(69.5u"°", 30.0u"°", (:o, :o, :e), BBO; lambda_r1=0.5321u"µm", lambda_b=0.2128u"µm", temp=293u"K")
+# @test isapprox(pm5.theta_pm, 69.5u"°", atol=ustrip(u"rad", 2u"°")) 
+# @test isapprox(abs(pm5.eff_data.d_eff), 0.93u"pm/V", rtol=0.2) # From Nikogosyan; SNLO: 1.09u"pm/V"

@@ -120,8 +120,7 @@ struct PMEfficiencyData
 end
 
 function PMEfficiencyData(pm_data::PMCollinearData, refr_data::PMRefractionData)
-    d_eff = calc_d_eff(pm_data.cr, refr_data.E_dir_rrb...)
-    # d_eff = calc_d_eff(pm_data.cr, refr_data.E_dir_rrb...; lambda_rrb=pm_data.lambda_rrb, temp=pm_data.temp)
+    d_eff = calc_d_eff(pm_data.cr, refr_data.E_dir_rrb...; lambda_rrb=pm_data.lambda_rrb, temp=pm_data.temp)
     S_0_Lsquared = (ε_0 * c_0 * pm_data.lambda_rrb[1] * pm_data.lambda_rrb[2] * prod(refr_data.n_rrb)) / (8 * π^2 * d_eff^2)
     return PMEfficiencyData(
         d_eff,

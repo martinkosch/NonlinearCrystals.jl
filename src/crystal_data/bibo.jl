@@ -101,15 +101,15 @@ function create_bibo()
         d36=2.43u"pm/V", # (3, 1, 2)
     )
 
-    # miller_delta = calc_miller_delta(
-    #     d_XYZ_full, 
-    #     n_X_principal, 
-    #     n_Y_principal, 
-    #     n_Z_principal, 
-    #     temp_ref;  
-    #     lambda_r1=1079.5u"nm", 
-    #     lambda_r2=1079.5u"nm", 
-    # )
+    miller_delta = calc_miller_delta(
+        d_XYZ_full, 
+        n_X_principal, 
+        n_Y_principal, 
+        n_Z_principal, 
+        temp_ref;  
+        lambda_r1=1079.5u"nm", 
+        lambda_r2=1079.5u"nm", 
+    )
 
     BIBO = BidirectionalCrystal(
         metadata,
@@ -117,7 +117,7 @@ function create_bibo()
         n_Y_principal,
         n_Z_principal,
         d_XYZ_full;
-        # miller_delta,
+        miller_delta,
     )
     return BIBO
 end

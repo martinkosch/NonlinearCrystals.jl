@@ -31,5 +31,5 @@ pm1 = find_nearest_pm_along_theta_phi(71.8u"°", 30.0u"°", (:hi, :hi, :lo), LNB
 @test isapprox(pm1.phi_pm, 30.0u"°", atol=ustrip(u"rad", 1u"°"))
 @test isapprox(abs(pm1.eff_data.d_eff), 4.94u"pm/V", rtol=0.1) # From SNLO
 
-# Test sampled noncritical phasematches (from: Handbook of Nonlinear Crystals)
+# Test sampled noncritical phasematches 
 # TODO

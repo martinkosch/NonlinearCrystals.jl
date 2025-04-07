@@ -8,7 +8,7 @@ using Unitful
 @test LNB_M.n_o_principal(default_lambda(LNB_M), default_temp(LNB_M)) > 1
 @test LNB_M.n_e_principal(default_lambda(LNB_M), default_temp(LNB_M)) > 1
 
-# Sample refractive indices (from: Handbook of Nonlinear Crystals)
+# Sample refractive indices
 # TODO
 
 # Test optical axis
@@ -17,5 +17,5 @@ using Unitful
 # Test sampled phasematches
 # TODO
 
-# Test sampled noncritical phasematches (from: Handbook of Nonlinear Crystals)
+# Test sampled noncritical phasematches
 # TODO

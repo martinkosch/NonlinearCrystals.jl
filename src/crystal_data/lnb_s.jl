@@ -36,15 +36,15 @@ function create_lnb_s()
         temp_ref,
     )
 
-    d_XYZ_full = calc_d_XYZ_full(metadata[:point_group]; d22=2.46u"pm/V", d31=-4.64u"pm/V", d33=-41.7u"pm/V") # Measured at 1.058 µm
+    d_XYZ_full = calc_d_XYZ_full(metadata[:point_group]; d22=2.46u"pm/V", d31=-4.64u"pm/V", d33=-41.7u"pm/V") 
 
     miller_delta = calc_miller_delta(
         d_XYZ_full,
         n_o_principal,
         n_e_principal,
-        temp_ref;  # TODO: This is a test/guess!
-        lambda_r1=800u"nm", # TODO: This is a test/guess!
-        lambda_r2=800u"nm", # TODO: This is a test/guess!
+        temp_ref;  
+        lambda_r1=1058u"nm", 
+        lambda_r2=1058u"nm", 
     )
 
     LNB_S = UnidirectionalCrystal(

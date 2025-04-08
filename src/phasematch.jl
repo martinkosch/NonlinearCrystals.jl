@@ -116,32 +116,38 @@ end
 
 struct PMEfficiencyData
     d_eff::typeof(1.0u"m/V")
+    d_eff_no_miller::typeof(1.0u"m/V")
     S0_Lsquared::typeof(1.0u"W")
+    S0_Lsquared_no_miller::typeof(1.0u"W")
 end
 
 function PMEfficiencyData(pm_data::PMCollinearData, refr_data::PMRefractionData)
-    d_eff = calc_d_eff(pm_data.cr, refr_data.E_dir_rrb...; lambda_rrb=pm_data.lambda_rrb, temp=pm_data.temp)
+    d_eff = calc_d_eff(pm_data.cr, refr_data.E_dir_rrb...; lambda_rrb=pm_data.lambda_rrb, temp=pm_data.temp, use_miller_scaling=true)
+    d_eff_no_miller = calc_d_eff(pm_data.cr, refr_data.E_dir_rrb...; lambda_rrb=pm_data.lambda_rrb, temp=pm_data.temp, use_miller_scaling=false)
     S_0_Lsquared = (ε_0 * c_0 * pm_data.lambda_rrb[1] * pm_data.lambda_rrb[2] * prod(refr_data.n_rrb)) / (8 * π^2 * d_eff^2)
+    S_0_Lsquared_no_miller = (ε_0 * c_0 * pm_data.lambda_rrb[1] * pm_data.lambda_rrb[2] * prod(refr_data.n_rrb)) / (8 * π^2 * d_eff_no_miller^2)
     return PMEfficiencyData(
         d_eff,
+        d_eff_no_miller,
         S_0_Lsquared,
+        S_0_Lsquared_no_miller,
     )
 end
 
 struct PMBandwidthData
-    lambda_L_bw::NTuple{3,typeof(1.0u"Hz*m")}
+    omega_L_bw::NTuple{3,typeof(1.0u"Hz*m")}
     temp_L_bw::typeof(1.0u"K*m")
     theta_L_bw::typeof(1.0u"rad*m")
     phi_L_bw::typeof(1.0u"rad*m")
 end
 
 function PMBandwidthData(pm_data::PMCollinearData, refr_data::PMRefractionData)
-    lambda_L_bw = lambda_L_bandwidths(refr_data)
+    omega_L_bw = lambda_L_bandwidths(refr_data)
     temp_L_bw = temperature_L_bandwidth(pm_data)
     theta_L_bw = theta_L_bandwidth(pm_data)
     phi_L_bw = phi_L_bandwidth(pm_data)
     return PMBandwidthData(
-        lambda_L_bw,
+        omega_L_bw,
         temp_L_bw,
         theta_L_bw,
         phi_L_bw,
@@ -275,7 +281,7 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     @printf(io, "%-29s %-25s %-25s %-25s\n", "TOD (fs³/mm):", tod...)
 
     # Bandwidths
-    ωbw = auto_fmt.(ustrip.(u"GHz*cm", round.(u"GHz*cm", cpm.bw_data.lambda_L_bw; digits)))
+    ωbw = auto_fmt.(ustrip.(u"GHz*cm", round.(u"GHz*cm", cpm.bw_data.omega_L_bw; digits)))
     @printf(io, "%-29s %-25s %-25s %-25s\n", "ω BW × L (GHz·cm):", ωbw...)
 
     @printf(io, "%-29s %-25s\n", "T BW × L (K·cm):",
@@ -288,11 +294,21 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
         auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", cpm.bw_data.phi_L_bw; digits))))
 
     # Efficiency
-    @printf(io, "%-29s %-25s\n", "d_eff (pm/V):",
-        auto_fmt(ustrip(u"pm/V", round(u"pm/V", cpm.eff_data.d_eff; digits))))
+    @printf(io, "%-29s %-25s\n", 
+        "d_eff (pm/V):",
+        auto_fmt(ustrip(u"pm/V", round(u"pm/V", cpm.eff_data.d_eff; digits))) * 
+        " (w/o Miller scaling: " * 
+        auto_fmt(ustrip(u"pm/V", round(u"pm/V", cpm.eff_data.d_eff_no_miller; digits))) * 
+        ")"
+    )
 
-    @printf(io, "%-29s %-25s\n", "S₀ × L² (W):",
-        auto_fmt(ustrip(u"W", round(u"W", cpm.eff_data.S0_Lsquared; sigdigits=digits))))
+    @printf(io, "%-29s %-25s\n", 
+            "S₀ × L² (W):",
+            auto_fmt(ustrip(u"W", round(u"W", cpm.eff_data.S0_Lsquared; sigdigits=digits))) * 
+            " (w/o Miller scaling: " * 
+            auto_fmt(ustrip(u"W", round(u"W", cpm.eff_data.S0_Lsquared_no_miller; sigdigits=digits))) *
+            ")"
+        )
 
     println(io, "────────────────────────────────────────────────────────────────────────────────────────────────────────")
 end

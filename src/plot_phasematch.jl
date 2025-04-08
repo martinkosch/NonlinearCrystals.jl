@@ -340,10 +340,9 @@ function plot_critical_pms(cr::NonlinearCrystal;
     lambda_b::Union{Nothing,Length}=nothing,
     temp::Temperature=default_temp(cr),
     n_points::Integer=100,
-    limit_to_first_octant::Bool=true,
+    skip_symmetric_pms::Bool=false,
     size::NTuple{2,Int}=(700, 1200)
 )
-
     lambda_rrb = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
 
     # Set hi/lo permutations
@@ -357,13 +356,13 @@ function plot_critical_pms(cr::NonlinearCrystal;
     # Compute phase matches
     all_pm = map(hi_or_lo_rrb) do hilo
         θ_range, ϕ_range, all_delta_k = compute_delta_k_grid(
-            cr, 
-            hilo, 
-            lambda_rrb..., 
-            temp, 
-            n_points; 
-            theta_range_max=(limit_to_first_octant ? 90u"°" : 180u"°"), 
-            phi_range_max=(limit_to_first_octant ? 90u"°" : 360u"°"),
+            cr,
+            hilo,
+            lambda_rrb...,
+            temp,
+            n_points;
+            theta_range_max=(skip_symmetric_pms ? 90u"°" : 180u"°"),
+            phi_range_max=(skip_symmetric_pms ? 90u"°" : 360u"°"),
         )
 
         # Generate contours
@@ -372,13 +371,13 @@ function plot_critical_pms(cr::NonlinearCrystal;
         return map(cpl.contours[1].lines) do cl
             return map(cl.vertices) do v
                 return find_nearest_pm_along_theta_phi(
-                    v[1] |> u"°", 
-                    v[2] |> u"°", 
-                    hilo, 
-                    cr; 
-                    temp, 
-                    lambda_r1=lambda_rrb[1], 
-                    lambda_r2=lambda_rrb[2], 
+                    v[1] |> u"°",
+                    v[2] |> u"°",
+                    hilo,
+                    cr;
+                    temp,
+                    lambda_r1=lambda_rrb[1],
+                    lambda_r2=lambda_rrb[2],
                     lambda_b=lambda_rrb[3]
                 )
             end
@@ -386,45 +385,46 @@ function plot_critical_pms(cr::NonlinearCrystal;
     end
 
     # Set up data, units, and data sources
-    labels_units = [
-        ("Phase velocity / c₀", nothing), 
-        ("Group velocity / c₀", nothing),
-        ("GDD", u"fs^2/mm"), 
-        ("Walkoff angle", u"mrad"),
-        ("|d_eff|", u"pm/V"), 
-        ("ϕ", u"°"), 
-        ("θ", u"°"), 
-        ("Type", nothing)
-    ]
-
-    prop_extractors = [
-        pm -> pm.n_rrb, 
-        pm -> pm.group_index_rrb, 
-        pm -> pm.beta2_rrb, 
-        pm -> pm.walkoff_angle_rrb,
-        pm -> abs(pm.eff_data.d_eff),
-        pm -> pm.phi_pm, 
-        pm -> pm.theta_pm
+    axis_data = [
+        ("Phase vel. / c₀", nothing, nothing, pm -> pm.n_rrb),
+        ("Group vel. / c₀", nothing, nothing, pm -> pm.group_index_rrb),
+        ("GDD", u"fs^2/mm", nothing, pm -> pm.beta2_rrb),
+        ("Walkoff angle", u"mrad", nothing, pm -> pm.walkoff_angle_rrb),
+        ("ω BW × L", u"GHz * cm", (0u"GHz * cm", 1000u"GHz * cm"), pm -> pm.bw_data.omega_L_bw),
+        ("T BW × L", u"K * cm", (0u"K * cm", 100u"K * cm"), pm -> pm.bw_data.temp_L_bw),
+        ("ϕ BW × L", u"mrad * cm", (0u"mrad * cm", 100u"mrad * cm"), pm -> pm.bw_data.phi_L_bw),
+        ("θ BW × L", u"mrad * cm", (0u"mrad * cm", 100u"mrad * cm"), pm -> pm.bw_data.theta_L_bw),
+        # ("|d_eff_no_miller|", u"pm/V", nothing, pm -> abs(pm.eff_data.d_eff_no_miller)),
+        ("|d_eff|", u"pm/V", nothing, pm -> abs(pm.eff_data.d_eff)),
+        ("ϕ", u"°", nothing, pm -> pm.phi_pm),
+        ("θ", u"°", nothing, pm -> pm.theta_pm),
+        ("Type", nothing, nothing, nothing),
     ]
 
     # Create figure and axes
     f = Figure(; size)
     axes = [
         Axis(f[i, 1],
-        ylabel=lu[1],
-        dim2_conversion=isnothing(lu[2]) ? nothing : Makie.UnitfulConversion(lu[2]; units_in_label=true))
-        for (i, lu) in enumerate(labels_units)
+            ylabel=ad[1],
+            dim2_conversion=isnothing(ad[2]) ? nothing : Makie.UnitfulConversion(ad[2]; units_in_label=true))
+        for (i, ad) in enumerate(axis_data)
     ]
 
     foreach(hidexdecorations!, axes[1:end-1])
     hidedecorations!(axes[end])
+    linkxaxes!(axes)
 
     # Plot data
     start = 0
     for hl in all_pm, l in hl
         idx_range = start .+ (0:length(l)-1)
 
-        for (ax, extr) in zip(axes, prop_extractors)
+        for i in eachindex(axis_data)
+            ax = axes[i]
+            un = axis_data[i][2]
+            lims = axis_data[i][3]
+            extr = axis_data[i][4]
+            isnothing(extr) && continue
             data = [extr(pm) for pm in l]
             if length(data[1]) == 3
                 for (comp, col) in zip(1:3, [COL_R1, COL_R2, COL_B])
@@ -445,9 +445,28 @@ function plot_critical_pms(cr::NonlinearCrystal;
         else
             join(l[1].hi_or_lo_rrb, ", ")
         end
-
         text!(axes[end], start + (length(l) - 1) / 2, 0.5; text=label_text, align=(:center, :center))
+
         start += length(l) + 30
+    end
+
+    # Restrict automatic y axis limits to specified limits 
+    for hl in all_pm, l in hl
+        for i in eachindex(axis_data)
+            ax = axes[i]
+            un = axis_data[i][2]
+            lims = axis_data[i][3]
+            autolimits!(ax)
+            if !isnothing(lims)
+                current_ylims = ax.yaxis.attributes.limits[] .* un
+                ylims!(
+                    ax,
+                    (
+                        max(current_ylims[1], lims[1]),
+                        min(current_ylims[2], lims[2])
+                    ))
+            end
+        end
     end
 
     return f
@@ -590,7 +609,7 @@ function plot_polar_mode(
     uc = Makie.UnitfulConversion(u"°"; units_in_label=true)
     cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))"
     lambda_info = "$(round(u"nm", lambda_rrb[1]; digits)) (λ_r1, $(hi_or_lo_rrb[1])) + $(round(u"nm", lambda_rrb[2]; digits)) (λ_r2, $(hi_or_lo_rrb[2])) = $(round(u"nm", lambda_rrb[3]; digits)) (λ_b, $(hi_or_lo_rrb[3]))"
-    ax = Axis3(
+    ax = Axis(
         f[1, 1],
         xlabel="ϕ",
         ylabel="θ",

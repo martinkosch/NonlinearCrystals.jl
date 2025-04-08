@@ -255,9 +255,10 @@ function calc_d_eff(
     E_dir_b::AbstractVector{<:Number};
     lambda_rrb::Union{NTuple{3,Length},Nothing}=nothing,
     temp::Temperature=default_temp(cr),
+    use_miller_scaling::Bool=true,
 )
     # Use Miller scaling if all lambdas are given and Miller's delta has been calculated during crystal initialization
-    if isnothing(cr.miller_delta) || isnothing(lambda_rrb)
+    if !use_miller_scaling || isnothing(cr.miller_delta) || isnothing(lambda_rrb)
         d_XYZ_full = cr.d_XYZ_ref_full
     else
         d_XYZ_full = miller_rescale(cr, lambda_rrb; temp)

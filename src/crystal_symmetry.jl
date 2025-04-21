@@ -49,6 +49,12 @@ const POINT_GROUP_MAP = Dict(
     "m-3m"   => "Cubic"
 )
 
+"""
+    crystal_system(point_group::AbstractString)
+
+Returns the name of the crystal system corresponding to the given crystallographic point group (e.g., `"mm2" → "Orthorhombic"`).
+Throws an error if the point group is unknown. Based on conventional assignments from nonlinear optics literature.
+"""
 function crystal_system(point_group::AbstractString) 
     if haskey(POINT_GROUP_MAP, point_group)
         return POINT_GROUP_MAP[point_group]
@@ -296,6 +302,14 @@ function find_zero_under_kleinman(pg::String)
     return setdiff(normal_coefs, kleinman_coefs)
 end
 
+"""
+    plot_symmetry(point_group::AbstractString)
+
+Visualizes the symmetry relations between nonlinear tensor components `d_ij` for a given point group.
+
+Black lines indicate symmetry relations that follow from the basic point group; dashed lines show those that appear only under Kleinman symmetry assumptions.
+Black circles represent same-sign components; white circles represent opposite signs. Square markers indicate coefficients that become zero under Kleinman conditions.
+"""
 function plot_symmetry(point_group::AbstractString)
     # Coordinates for each d_ij in a 6×3 grid
     coords = Dict(

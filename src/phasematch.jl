@@ -1,5 +1,13 @@
 export PhaseMatch, CollinearPhaseMatch, pm_wavelengths, find_all_pms_along_dimension, find_all_ncpm_over_temp, find_all_ncpm_over_lambda, find_nearest_pm_along_lambda_r_b, find_nearest_pm_along_theta_phi, delta_k
 
+"""
+    PMRefractionData
+
+Stores all refractive, group, and dispersion properties for the three interacting waves in a phasematching configuration.
+This includes refractive indices, group indices, walkoff angles, polarization vectors (`E`, `D`, `S`), and dispersion parameters (β₀ to β₃) for the two red and one blue waves (r₁, r₂, b).
+This is typically constructed from three [`RefractionData`](@ref) instances.
+"""
+
 struct PMRefractionData
     n_rrb::NTuple{3,Float64}
     group_index_rrb::NTuple{3,Float64}
@@ -33,6 +41,14 @@ end
 
 PMRefractionData(rd_r1::RefractionData, rd_r2::RefractionData, rd_b::RefractionData) = PMRefractionData((rd_r1, rd_r2, rd_b))
 
+"""
+    PMType
+
+Describes the polarization type of a phasematching configuration, including the principal plane (e.g. `:XY` or `:UD` for uniaxial crystals),
+the polarization of each wave (`:o` or `:e`), and a human-readable type classification like `"I"`, `"II/III"`, `"IV"`, or `"V"`.
+
+Used for diagnostic purposes and auto-labeling of phasematch types.
+"""
 struct PMType
     principal_plane::Union{Symbol}
     o_or_e_rrb::NTuple{3,Symbol}
@@ -75,6 +91,14 @@ function PMType(
     return PMType(principal_plane, o_or_e_rrb, type)
 end
 
+"""
+    PMCollinearData
+
+Represents the geometry and wavelengths of a collinear phasematching configuration, including propagation angles `theta_pm` and `phi_pm`,
+crystal reference, temperature, and polarization type data (`hi_or_lo_rrb` and optional [`PMType`](@ref) classification).
+
+This is the geometric input used to calculate [`CollinearPhaseMatch`](@ref) properties.
+"""
 struct PMCollinearData{CT<:NonlinearCrystal}
     hi_or_lo_rrb::NTuple{3,Symbol}
     pm_type::NTuple{2,Union{Nothing,PMType}}
@@ -114,6 +138,12 @@ function PMCollinearData(
     )
 end
 
+"""
+    PMEfficiencyData
+
+Stores the effective nonlinear coefficient `d_eff` (with and without Miller scaling) and the associated conversion factor `S₀·L²`.
+Used to compare the efficiency of different phasematching solutions based on geometry and polarization.
+"""
 struct PMEfficiencyData
     d_eff::typeof(1.0u"m/V")
     d_eff_no_miller::typeof(1.0u"m/V")
@@ -134,6 +164,26 @@ function PMEfficiencyData(pm_data::PMCollinearData, refr_data::PMRefractionData)
     )
 end
 
+"""
+    PMBandwidthData
+
+Represents the phasematching bandwidths of a collinear configuration, defined as the range of parameters over which the phase mismatch Δk remains within ±π / L for a given interaction length L.
+
+The stored values are ΔX · L quantities (units of Hz·m, K·m, rad·m), which characterize the *tolerance* of the phasematching condition to changes in each parameter X:
+
+- `omega_L_bw`: Tuple of angular frequency bandwidths (Δω · L) for the three waves (r₁, r₂, b). Each entry is computed by holding that wave's frequency fixed while adjusting the other two to maintain the phasematching condition (1/λ_r₁ + 1/λ_r₂ = 1/λ_b).  
+- `temp_L_bw`: Temperature bandwidth (ΔT · L) computed by evaluating how Δk varies with small temperature changes, with all wavelengths and geometry fixed.
+- `theta_L_bw`: Angular bandwidth with respect to polar angle θ (Δθ · L), evaluated at fixed temperature and wavelengths.
+- `phi_L_bw`: Angular bandwidth with respect to azimuthal angle ϕ (Δϕ · L), also at fixed conditions.
+
+These values describe how sensitive the phasematching is to deviations in each parameter. For example, a small `theta_L_bw` means tight angular alignment is needed, while a large `temp_L_bw` suggests thermally robust operation.
+
+Bandwidths are calculated as:
+```math
+ΔX · L = \\frac{2π}{|∂Δk/∂X|}
+```
+where Δk is the phase mismatch, and X is one of frequency, temperature, or angle. 
+"""
 struct PMBandwidthData
     omega_L_bw::NTuple{3,typeof(1.0u"Hz*m")}
     temp_L_bw::typeof(1.0u"K*m")
@@ -156,6 +206,13 @@ end
 
 abstract type PhaseMatch end
 
+"""
+    CollinearPhaseMatch <: PhaseMatch
+
+Encapsulates a full collinear phasematching solution, including refractive data, geometric parameters, 
+nonlinear efficiency, and bandwidths (fields `refr_data`, `pm_data`, `eff_data`, and `bw_data`, respectively).
+In addition, field access is forwarded to the internal fields of both `refr_data` and `pm_data` for convenience.
+"""
 struct CollinearPhaseMatch{CT<:NonlinearCrystal} <: PhaseMatch
     refr_data::PMRefractionData
     pm_data::PMCollinearData{CT}
@@ -313,7 +370,16 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     println(io, "────────────────────────────────────────────────────────────────────────────────────────────────────────")
 end
 
+"""
+    pm_wavelengths(; lambda_r1=nothing, lambda_r2=nothing, lambda_b=nothing)
 
+Given any two of the three wavelengths involved in a second-order three-wave interaction (`λ_r1`, `λ_r2`, `λ_b`), compute the third to satisfy energy conservation:
+```math
+1 / λ_{b} = 1 / λ_{r,1} + 1 / λ_{r,2}
+```
+
+Returns the tuple (λ_r1, λ_r2, λ_b). Throws an error if the relation is not fulfilled or fewer than two inputs are provided. 
+"""
 function pm_wavelengths(;
     lambda_r1::Union{Nothing,Length}=nothing,
     lambda_r2::Union{Nothing,Length}=nothing,
@@ -340,15 +406,21 @@ function pm_wavelengths(;
 end
 
 function delta_k(
-    θ_pm::Angle,
+    theta_pm::Angle,
     hi_or_lo_rrb::NTuple{3,Symbol},
     cr::UnidirectionalCrystal;
     kwargs...
 )
     # Use symmetry in unidirectional crystals
-    return delta_k(θ_pm, 0.0u"°", hi_or_lo_rrb, cr; kwargs...)
+    return delta_k(theta_pm, 0.0u"°", hi_or_lo_rrb, cr; kwargs...)
 end
 
+"""
+    delta_k(theta_pm, phi_pm, hi_or_lo_rrb, cr; lambda_r1, lambda_r2, lambda_b, temp)
+
+Computes the phase mismatch Δk = k_r1 + k_r2 - k_b for a given configuration.
+Each `k_i` is calculated from `2π * n_i / λ_i` based on the given crystal `cr`, propagation angles `theta_pm`, `phi_pm`, and the three polarization types `hi_or_lo_rrb`.
+"""
 function delta_k(
     theta_pm::Angle,
     phi_pm::Angle,
@@ -369,9 +441,17 @@ function delta_k(
     return 2π * (n_r1 / lambda_r1 + n_r2 / lambda_r2 - n_b / lambda_b)
 end
 
+"""
+    delta_k_with_shifting(theta_pm, phi_pm, hi_or_lo_rrb, cr; ...)
+
+Same as [`delta_k`](@ref), but allows small parameter perturbations (Δθ, Δϕ, ΔT, Δω_r1, Δω_r2, Δω_b).
+The frequency shifts adjust the wavelengths while conserving energy (Δω_r1 + Δω_r2 = Δω_b), enabling bandwidth estimation.
+
+Used internally for computing how Δk varies with perturbations for calculating ΔX · L quantities in [`PMBandwidthData`](@ref).
+"""
 function delta_k_with_shifting(
-    θ_pm::Angle,
-    ϕ_pm::Angle,
+    theta_pm::Angle,
+    phi_pm::Angle,
     hi_or_lo_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
     lambda_r1::Union{Nothing,Length}=nothing,
@@ -394,8 +474,8 @@ function delta_k_with_shifting(
     lambda_b_shifted = shift_lambda_with_freq(lambda_b, delta_omega_b)
 
     delta_k(
-        (θ_pm + delta_theta) |> u"rad",
-        (ϕ_pm + delta_phi) |> u"rad",
+        (theta_pm + delta_theta) |> u"rad",
+        (phi_pm + delta_phi) |> u"rad",
         hi_or_lo_rrb,
         cr;
         lambda_r1=lambda_r1_shifted,
@@ -530,6 +610,15 @@ function phi_L_bandwidth(pm_data::PMCollinearData)
 end
 
 
+"""
+    find_nearest_pm_along_theta_phi(theta_target, phi_target, pol_rrb, cr; ...)
+
+Searches for the phasematching configuration closest to a given direction (`theta_target`, `phi_target`) by 
+scanning phasematches at fixed θ or fixed ϕ, using `find_all_pms_along_dimension`.
+
+The search returns the [`CollinearPhaseMatch`](@ref) whose propagation direction is most aligned (in dot product) with the target vector.
+Returns `nothing` if no solution is found.
+"""
 function find_nearest_pm_along_theta_phi(
     theta_target::Angle,
     phi_target::Angle,
@@ -548,16 +637,26 @@ function find_nearest_pm_along_theta_phi(
     all_pm_candidates = [[pm for pm in all_pm_θ_fixed]; [pm for pm in all_pm_ϕ_fixed]]
     isempty(all_pm_candidates) && return nothing
 
-    all_θ_pm_candidates = [pm.theta_pm for pm in all_pm_candidates]
-    all_ϕ_pm_candidates = [pm.phi_pm for pm in all_pm_candidates]
+    all_theta_pm_candidates = [pm.theta_pm for pm in all_pm_candidates]
+    all_phi_pm_candidates = [pm.phi_pm for pm in all_pm_candidates]
 
     target_vec = angles_to_vector(theta_target, phi_target)
-    pm_candidate_vecs = angles_to_vector.(all_θ_pm_candidates, all_ϕ_pm_candidates)
+    pm_candidate_vecs = angles_to_vector.(all_theta_pm_candidates, all_phi_pm_candidates)
     i_nearest = findmax([dot(pm_vec, target_vec) for pm_vec in pm_candidate_vecs])[2]
 
     return all_pm_candidates[i_nearest]
 end
 
+"""
+    find_nearest_pm_along_lambda_r_b(pol_rrb, cr; lambda_r1, lambda_r2, lambda_b, ...)
+
+Searches for the best phasematch for a given pair of red and blue wavelengths. You must specify exactly one of `lambda_r1` or `lambda_r2`, plus `lambda_b`.
+
+Scans along both the missing red wavelength and the blue wavelength, finds all matching configurations (via [`find_all_pms_along_dimension`](@ref)),
+and returns the one closest to the provided values.
+
+Used to fine-tune a target wavelength combination to an actual valid phasematch geometry.
+"""
 function find_nearest_pm_along_lambda_r_b(
     pol_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
@@ -610,6 +709,13 @@ function find_nearest_pm_along_lambda_r_b(
     return all_pm_candidates[i_nearest]
 end
 
+"""
+    find_all_ncpm_over_temp(pol_rrb, cr; lambda_r1, lambda_r2, lambda_b, temp_min, temp_max, ...)
+
+Returns all noncritical phasematching (NCPM) configurations where Δk = 0 can be achieved by tuning the *temperature*.
+You must specify at least two of the three wavelengths, and a temperature range `[temp_min, temp_max]`. The search is limited to propagation along principal axes.
+Returns an array of [`CollinearPhaseMatch`](@ref) solutions. The return value can be an empty array if no solution is found.
+"""
 function find_all_ncpm_over_temp(
     pol_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;
@@ -636,6 +742,13 @@ function find_all_ncpm_over_temp(
     )
 end
 
+"""
+    find_all_ncpm_over_lambda(pol_rrb, cr, temp; lambda_r1, lambda_r2, lambda_b, ...)
+
+Finds all noncritical phasematches (NCPM) by varying wavelength, while keeping the temperature fixed.
+You must specify exactly one of the three wavelengths (`lambda_r1`, `lambda_r2`, or `lambda_b`) and leave the others as `nothing`. The scan range is chosen automatically based on the crystal's validity domain.
+Returns a list of [`CollinearPhaseMatch`](@ref) solutions found within the allowed range. The return value can be an empty array if no solution is found.
+"""
 function find_all_ncpm_over_lambda(
     pol_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal,
@@ -662,6 +775,21 @@ function find_all_ncpm_over_lambda(
     )
 end
 
+"""
+    find_all_pms_along_dimension(pol_rrb, cr; ...)
+
+Performs a one-dimensional search to find all collinear phasematching solutions (Δk ≈ 0) for a given polarization tuple `pol_rrb`.
+
+Depending on which parameters are held fixed (`lambda_r1`, `lambda_r2`, `lambda_b`, `temp_min == temp_max`, or angular constraints like `theta_fixed`), this scans over:
+
+- Wavelength (λ_b or λ_r1)
+- Temperature
+- Angle (θ or ϕ)
+
+This function is the main backend used by higher-level routines like [`find_nearest_pm_along_theta_phi`](@ref) or [`find_all_ncpm_over_temp`](@ref).
+
+Returns a list of [`CollinearPhaseMatch`](@ref) solutions found by detecting sign changes in Δk via a global search and refining them with bisection.
+"""
 function find_all_pms_along_dimension(
     pol_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;

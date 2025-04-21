@@ -150,6 +150,17 @@ function split_and_interpolate(cb::AbstractVector, cr::AbstractVector, sign_swit
     return segments_cb, segments_cr, cb_intersections, cr_intersections, segment_signs
 end
 
+"""
+    calc_noncritical_pm_lines(principal_axis, hi_or_lo_rrb, cr; ...)
+
+Computes the coordinates of Δk = 0 isolines in the λ_b-λ_r1 parameter space where **noncritical phasematching** is achieved
+(i.e., phase matching occurs at fixed propagation direction, along the crystal's `principal_axis`).
+
+Returns:
+- `segments_b`: vector of λ_b curves (x-axis)
+- `segments_r`: corresponding λ_r1 curves (y-axis)
+- `cb_intersections`, `cr_intersections`: SHG symmetry intersection points (e.g., λ_b = λ_r / 2)
+"""
 function calc_noncritical_pm_lines(
     principal_axis::Symbol,
     hi_or_lo_rrb::NTuple{3,Symbol},
@@ -280,6 +291,19 @@ function plot_single_noncritical_pm!(
     return ax
 end
 
+"""
+    plot_noncritical_pms(principal_axis, cr; ...)
+
+Generates an interactive plot of all **noncritical phasematching lines** (Δk = 0) in λ_b-λ_r1 space for a given crystal `cr`
+along the selected `principal_axis`.
+
+Each plotted contour represents a set of wavelength triplets (λ_r1, λ_r2, λ_b) that satisfy phasematching without angular adjustment.
+Supports both Type I (equal polarization) and Type II (cross-polarized) combinations.
+
+You can control the polarization combination via `hi_or_lo_rrb`, limit the scan ranges, and adjust the resolution with `ngrid`.
+
+Returns a GLMakie `Figure`.
+"""
 function plot_noncritical_pms(
     principal_axis::Symbol,
     cr::NonlinearCrystal;
@@ -332,7 +356,40 @@ function plot_noncritical_pms(
     return f
 end
 
+"""
+    plot_critical_pms(cr::NonlinearCrystal; kwargs...) -> Figure
 
+Visualizes and compares **critical phase-matching solutions** for a given nonlinear crystal `cr` across all possible
+polarization configurations and propagation directions. This plot gives insight into how the phasematching 
+characteristics vary with angle for a **fixed wavelength triplet** (λ_r1, λ_r2, λ_b).
+
+Each horizontal segment in the figure corresponds to a distinct type of phase-matching configuration, and
+the plot shows how key quantities vary along that solution contour (i.e., as a function of θ and ϕ for which Δk = 0).
+
+#### Plotted Quantities per Phasematch
+For each matched solution (Δk = 0), the following attributes are visualized:
+- **Phase velocity / c₀** — the normalized refractive indices (n)
+- **Group velocity / c₀** — inverse group indices (group velocity dispersion)
+- **GDD** — group delay dispersion (β₂), unit: fs²/mm
+- **Walkoff angle** — spatial beam walkoff, unit: mrad
+- **ω BW × L** — angular frequency bandwidth product (Δω·L), from group velocity mismatch
+- **T BW × L** — temperature tolerance (ΔT·L), from thermal dispersion mismatch
+- **ϕ BW × L**, **θ BW × L** — angular acceptance bandwidths
+- **|d_eff|** — effective nonlinearity (with Miller scaling applied)
+- **ϕ**, **θ** — propagation angles
+- **Type** — phase-matching type and polarization roles (label only)
+
+#### Optional Arguments
+- `hi_or_lo_rrb`: One or more polarization configurations (e.g., `(:hi, :hi, :lo)`)
+- `lambda_r1`, `lambda_r2`, `lambda_b`: At least two must be specified, the third is inferred
+- `temp`: Temperature at which to evaluate phasematching
+- `n_points`: Angular resolution
+- `size`: Plot size as a tuple (width, height)
+
+#### Output
+Returns a vertically stacked GLMakie `Figure` containing multiple linked plots, each showing one of the quantities above.
+Each horizontal span corresponds to a continuous critical phase-matching curve (i.e., varying θ and ϕ for fixed λ and T).
+"""
 function plot_critical_pms(cr::NonlinearCrystal;
     hi_or_lo_rrb::Union{NTuple{3,Symbol},AbstractVector{<:NTuple{3,Symbol}},Nothing}=nothing,
     lambda_r1::Union{Nothing,Length}=nothing,
@@ -472,6 +529,16 @@ function plot_critical_pms(cr::NonlinearCrystal;
     return f
 end
 
+"""
+    plot_delta_k_map(hi_or_lo_rrb, cr; ...)
+
+Plots a 2D or 3D map of the phasemismatch Δk over the angular domain (θ, ϕ) for a given polarization assignment (`hi_or_lo_rrb`)
+and wavelength triplet.
+
+Depending on `plot_type`:
+- `:polar` → Shows Mercator style projected θ–ϕ map with Δk color-coded and phase match contours overlaid
+- `:sphere` → Visualizes Δk on the surface of a 3D unit sphere using ray direction vectors
+"""
 function plot_delta_k_map(
     hi_or_lo_rrb::NTuple{3,Symbol},
     cr::NonlinearCrystal;

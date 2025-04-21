@@ -1,10 +1,10 @@
 export calc_d_XYZ_full, rot_mat_crys_to_diel, plot_axes_assignment_crys_to_diel, calc_miller_delta
 
 """
-    expand_voigt_index(i::Integer, l::Integer) -> Vector{NTuple{3,Int}}
+    expand_voigt_index(i::Integer, l::Integer)
 
-Given contracted Voigt indices (i, l), return list of (i, j, k) index tuples.
-Some `l` values map to two symmetric (j, k) combinations.
+Expands a contracted Voigt index pair `(i, l)` into the corresponding set of full tensor indices `(i, j, k)`.
+If `l` refers to a symmetric index (like `l = 5` for `j,k = 1,3` and `3,1`), both permutations are returned.
 """
 function expand_voigt_index(i::Integer, l::Integer)::Vector{NTuple{3,Int}}
     # Map contracted index l to full (j, k) pairs
@@ -49,7 +49,11 @@ function tensor_indices(comp::Symbol)
     (i, j)
 end
 
-# Expand 3x6 contracted tensor into full 3x3x3
+"""
+    expand_d_contract(d_contract::AbstractMatrix{<:Number})
+
+Expands a 3×6 Voigt-contracted nonlinear tensor into a full 3×3×3 tensor with explicit symmetry in the second and third indices.
+"""
 function expand_d_contract(d_contract::AbstractMatrix{<:Number})
     d_full = zeros(eltype(d_contract), 3, 3, 3)
     idx_map = [
@@ -71,7 +75,12 @@ function rotate_tensor3(d::AbstractArray{<:Number,3}, R::AbstractMatrix{<:Number
     @tullio d_rot[i_dash, j_dash, k_dash] := R[i_dash, i] * R[j_dash, j] * R[k_dash, k] * d[i, j, k]
 end
 
-# Contract back to 3x6
+"""
+    contract_d_tensor(d_full::AbstractArray{<:Number,3})
+
+Contracts a 3×3×3 nonlinear tensor into a 3×6 Voigt representation, assuming symmetry in the last two indices.
+This is the inverse of [`expand_d_contract`](@ref).
+"""
 function contract_d_tensor(d_full::AbstractArray{<:Number,3})
     d_contract = zeros(eltype(d_full), 3, 6)
     idx_map = [
@@ -90,17 +99,15 @@ function contract_d_tensor(d_full::AbstractArray{<:Number,3})
 end
 
 """
-    rot_mat_crys_to_diel(
-        axes_assignment_crys_to_diel::NTuple{3,Symbol};
-        rotate_about::Union{Symbol,Nothing}=nothing,
-        phi::Angle=0.0u"°"
-    )
+    rot_mat_crys_to_diel(axes_assignment_crys_to_diel::NTuple{3,Symbol};
+                         rotate_about::Union{Symbol,Nothing}=nothing,
+                         phi::Angle=0.0u"°")
 
-Returns the rotation matrix from crystallophysical (x,y,z) to dielectric (X,Y,Z) coordinates,
-by optionally rotating around a dielectric axis after reassigning the axes.
-- `axes_assignment_crys_to_diel`: 3-Tuple of Symbols (:X, :Y, :Z) indicating the assignment of crystallophysical to dielectric coordinates
-- `rotate_about`: Symbol (:X, :Y, or :Z) indicating which dielectric axis to rotate around after assignment
-- `phi`: rotation angle (applied after assignment)
+Returns a 3×3 rotation matrix that maps crystallophysical coordinates (x, y, z) to dielectric coordinates (X, Y, Z),
+based on an axis assignment tuple like `(:Z, :X, :Y)`.
+
+An optional additional rotation can be applied around the assigned dielectric axis (`:X`, `:Y`, or `:Z`) by an angle `phi`.
+This is used to align the nonlinear tensor with the dielectric frame expected by the rest of the simulation.
 """
 function rot_mat_crys_to_diel(
     axes_assignment_crys_to_diel::NTuple{3,Symbol};
@@ -161,6 +168,15 @@ function rot_mat_crys_to_diel(
     return rot_mat
 end
 
+"""
+    plot_axes_assignment_crys_to_diel(axes_assignment_crys_to_diel::NTuple{3,Symbol};
+                                      rotate_about::Union{Symbol,Nothing}=nothing,
+                                      phi::Angle=0.0u"°")
+
+Visualizes the transformation from crystallophysical axes (x, y, z) to dielectric axes (X, Y, Z) in 3D using GLMakie.
+The original axes are shown as dashed blue vectors, and the rotated dielectric frame is shown as solid red vectors.
+Used to verify the effect of `rot_mat_crys_to_diel`.
+"""
 function plot_axes_assignment_crys_to_diel(
     axes_assignment_crys_to_diel::NTuple{3,Symbol};
     rotate_about::Union{Symbol,Nothing}=nothing,
@@ -199,6 +215,17 @@ function plot_axes_assignment_crys_to_diel(
     return fig
 end
 
+"""
+    calc_d_XYZ_full(point_group::String, rot_mat=I(3), use_kleinman=true; components_abc...)
+
+Constructs the full 3×3×3 nonlinear tensor `d_XYZ_full` in the dielectric coordinate system for a given point group.
+
+You must provide at least one known tensor component using keyword arguments like `d14=...`, `d33=...`, etc.
+Remaining components are inferred using point group symmetry rules from either the standard or Kleinman-reduced tensor table.
+
+The optional `rot_mat` can be used to rotate the tensor from the frame of the specified tensor components (e.g. the crystallophysical frame) 
+to the dielectric frame used throughout the package.
+"""
 
 function calc_d_XYZ_full(
     point_group::String,
@@ -248,6 +275,16 @@ function calc_d_XYZ_full(
     return d_XYZ_full
 end
 
+"""
+    calc_d_eff(cr::NonlinearCrystal,
+               E_dir_r1, E_dir_r2, E_dir_b;
+               lambda_rrb=nothing, temp=default_temp(cr), use_miller_scaling=true)
+
+Computes the effective nonlinear coefficient `d_eff` for a given nonlinear crystal and polarization directions `E_dir_r1`, `E_dir_r2`, `E_dir_b`.
+
+If `lambda_rrb` (a 3-tuple of wavelengths) is provided and Miller data is available, the tensor is scaled using Miller's rule.
+Otherwise, the reference tensor `d_XYZ_ref_full` is used directly without Miller scaling.  
+"""
 function calc_d_eff(
     cr::NonlinearCrystal,
     E_dir_r1::AbstractVector{<:Number},
@@ -268,6 +305,14 @@ function calc_d_eff(
     return d_eff
 end
 
+"""
+    miller_rescale(cr::NonlinearCrystal, lambda_rrb; temp=default_temp(cr))
+
+Applies Miller scaling to the reference nonlinear tensor stored in `cr`, using its `miller_delta` data (if available).
+
+The result is a scaled tensor `d_XYZ_full` for the given wavelength triplet `lambda_rrb = (λ₁, λ₂, λ₃)`.
+This models the variation of nonlinear response with wavelength using Miller's empirical rule.
+"""
 function miller_rescale(
     cr::NonlinearCrystal,
     lambda_rrb::Union{NTuple{3,Length},Nothing};
@@ -316,6 +361,15 @@ function miller_rescale(
     return d_XYZ_full
 end
 
+"""
+    calc_miller_delta(d_ref_XYZ_full, n_X_principal, n_Y_principal, n_Z_principal, temp_ref;
+                      lambda_r1=nothing, lambda_r2=nothing, lambda_b=nothing)
+
+Computes the Miller scaling tensor Δᵢⱼₖ from a known nonlinear tensor `d_ref_XYZ_full` and refractive index models.
+
+Each χ⁽²⁾ component is scaled by the product of χ⁽¹⁾ values (defined as `n² − 1`) for the corresponding directions and wavelengths.
+You may also call this function with `n_o_principal` and `n_e_principal` for uniaxial crystals.
+"""
 function calc_miller_delta(
     d_ref_XYZ_full::AbstractArray{<:Number,3},
     n_X_principal::RefractiveIndex,
@@ -370,6 +424,15 @@ function calc_miller_delta(
     )
 end
 
+"""
+    plot_miller_scaling_coeffs_shg(cr::NonlinearCrystal;
+                                   temp=default_temp(cr),
+                                   size=(800, 600))
+
+Visualizes the Miller-scaled nonlinear tensor coefficients `d_ij(λ)` for second harmonic generation (SHG) as a function of blue wavelength `λ_b`.
+Assumes type-0 SHG, where the red wavelengths are `2λ_b`. All nonzero contracted components are plotted with interactive tooltips showing 
+wavelength and coefficient values. 
+"""
 function plot_miller_scaling_coeffs_shg(
     cr::NonlinearCrystal;
     temp::Temperature=default_temp(cr),

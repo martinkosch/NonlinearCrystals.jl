@@ -1,5 +1,13 @@
 export all_nonlinearcrystals, all_unidirectionalcrystals, all_bidirectionalcrystals
 
+"""
+    subtypes_in_module(mod::Module, T; recurse=false) -> Vector{T}
+
+Returns a list of all objects in module `mod` that are subtypes of type `T`.
+
+If `recurse=true`, submodules will also be searched recursively.
+Useful for dynamically collecting types defined under a module namespace.
+"""
 function subtypes_in_module(mod::Module, T; recurse=false)
     found = T[]
     for name in names(mod)
@@ -13,18 +21,41 @@ function subtypes_in_module(mod::Module, T; recurse=false)
     return found
 end
 
+"""
+    all_nonlinearcrystals()
+
+Return all available subtypes of `NonlinearCrystal` defined in the `NonlinearCrystals` module.
+"""
 function all_nonlinearcrystals()
     return subtypes_in_module(NonlinearCrystals, NonlinearCrystal)
 end
 
+"""
+    all_unidirectionalcrystals()
+
+Return all available subtypes of `UnidirectionalCrystal` defined in the `NonlinearCrystals` module.
+"""
 function all_unidirectionalcrystals()
     return subtypes_in_module(NonlinearCrystals, UnidirectionalCrystal)
 end
 
+"""
+    all_bidirectionalcrystals()
+
+Return all available subtypes of `BidirectionalCrystal` defined in the `NonlinearCrystals` module.
+"""
 function all_bidirectionalcrystals()
     return subtypes_in_module(NonlinearCrystals, BidirectionalCrystal)
 end
 
+"""
+    auto_fmt(x; digits=3, sci_thresh=1e4, inf_thresh=1e10) -> String
+
+Formats a numeric value `x` into a compact string:
+- Uses scientific notation for large/small values
+- Displays `"Inf"` or `"NaN"` for extreme cases
+- Controls decimal digits via `digits`
+"""
 function auto_fmt(x; digits=3, sci_thresh=1e4, inf_thresh=1e10)
     if isnan(x)
         return "NaN"
@@ -58,6 +89,13 @@ function draw_ellipsoid!(
     return ax
 end
 
+"""
+    vector_to_angles(v::AbstractVector{<:Number}) -> (θ::Angle, ϕ::Angle)
+
+Converts a 3D unit vector `v` to spherical coordinates:
+- θ (polar angle): 0 to π
+- ϕ (azimuthal angle): normalized to [0, 2π)
+"""
 function vector_to_angles(v::AbstractVector{<:Number})
     x, y, z = v
     r = sqrt(x^2 + y^2 + z^2)
@@ -67,6 +105,11 @@ function vector_to_angles(v::AbstractVector{<:Number})
     return θ, ϕ
 end
 
+"""
+    angles_to_vector(θ::Angle, ϕ::Angle) -> SVector{3,Float64}
+
+Returns a unit direction vector corresponding to spherical angles (θ, ϕ).
+"""
 function angles_to_vector(theta::Angle, phi::Angle)
     x = sin(theta) * cos(phi)
     y = sin(theta) * sin(phi)
@@ -74,6 +117,12 @@ function angles_to_vector(theta::Angle, phi::Angle)
     return @SVector [x, y, z]
 end
 
+"""
+    find_principal_planes(θ::Angle, ϕ::Angle; angle_tol=0.1u"°") -> (Symbol, Symbol)
+
+Returns up to two principal planes (`:XY`, `:XZ`, `:YZ`) to which the vector (θ, ϕ) is approximately aligned.
+Principal planes are defined as those orthogonal to the X, Y, or Z axes, within the given angular tolerance `angle_tol`.
+"""
 function find_principal_planes(theta::Angle, phi::Angle; angle_tol::Angle = 0.1u"°")
     v = angles_to_vector(theta, phi)
 
@@ -104,6 +153,11 @@ function find_principal_planes(theta::Angle, phi::Angle; angle_tol::Angle = 0.1u
     return (p1, p2)
 end
 
+"""
+    axes_to_θ_ϕ(axes::Union{Symbol, Vector{Symbol}}) -> Vector{Tuple{Angle, Angle}}
+
+Maps symbolic crystal axes (`:X`, `:Y`, `:Z`) to corresponding spherical direction angles (θ, ϕ).
+"""
 function axes_to_θ_ϕ(axes::Union{AbstractVector{Symbol},Symbol})
     axes = (axes isa Symbol) ? [axes] : axes
     θ_ϕ_dirs = map(axes) do a
@@ -120,7 +174,12 @@ function axes_to_θ_ϕ(axes::Union{AbstractVector{Symbol},Symbol})
     return θ_ϕ_dirs
 end
 
+"""
+    bool_permutations(val1, val2, n) -> Vector{NTuple{n, Any}}
 
+Returns all `2^n` permutations of `val1` and `val2` in an `n`-element tuple.
+Useful for enumerating polarization combinations (e.g., `:hi` / `:lo`).
+"""
 function bool_permutations(val1, val2, n::Integer)
     result = []
 
@@ -145,10 +204,16 @@ function eigenvals_2d(A::AbstractMatrix)
     (a, b, c, d) = A'
     @assert ((a + d) / 2)^2 - (a * d - b * c) >= 0.0 "This function cannot handle imaginary eigenvalues."
     discr = sqrt(((a + d) / 2)^2 - (a * d - b * c)) 
-    eigvals = (a + d) / 2 .+ [-discr, discr]
+    eigvals = (a + d) / 2 .+ (@SVector [-discr, discr])
     return eigvals
 end
 
+"""
+    eigen_2d(A::AbstractMatrix) -> (eigenvalues::Vector, eigenvectors::SMatrix{2,2})
+
+Returns sorted real eigenvalues and their corresponding orthonormal eigenvectors for a 2×2 matrix `A`.
+In comparison with the eigen implementation in Julia's base, this minimal implementation is compatible with ForwardDiff.jl.
+"""
 function eigen_2d(A::AbstractMatrix)
     eigvals = eigenvals_2d(A')
     
@@ -169,12 +234,25 @@ function eigen_2d(A::AbstractMatrix)
     end
 end
 
+"""
+    shift_lambda_with_freq(lambda::Length, Δω::Frequency) -> Length
+
+Applies a frequency shift `Δω` to the wavelength `λ`, using the relation:
+    ω = 2π·c / λ, and then λ' = 2π·c / (ω + Δω)
+Returns the shifted wavelength.
+"""
 function shift_lambda_with_freq(lambda::Length, delta_omega::Frequency)
     omega = c_0 ./ (2π * lambda)
     lambda_shifted = c_0 / (2π * (omega + delta_omega))
     return lambda_shifted
 end
 
+"""
+    split_on_nan(x::Vector, y::Vector) -> (Vector{Vector}, Vector{Vector})
+
+Splits two paired vectors into subsegments at `NaN` positions. 
+Each returned segment pair contains only valid (non-NaN) values.
+"""
 function split_on_nan(x::AbstractVector{T}, y::AbstractVector{T}) where {T}
     @assert length(x) == length(y) "Vectors must be the same length"
 
@@ -206,6 +284,14 @@ function split_on_nan(x::AbstractVector{T}, y::AbstractVector{T}) where {T}
     return segments_x, segments_y
 end
 
+"""
+    sign_switch_fractions(vec::Vector) -> (switch_indices, fractions, segment_signs)
+
+Given a vector of values, detects all zero crossings (i.e., sign changes), and returns:
+- indices of sign flips
+- linear interpolation fractions where zero-crossings occur
+- sign of each segment between crossings
+"""
 function sign_switch_fractions(vec::AbstractVector)
     # Find sign switches
     sign_switches = findall(i -> sign(vec[i]) != sign(vec[i+1]), 1:length(vec)-1)
@@ -235,6 +321,12 @@ function sign_switch_fractions(vec::AbstractVector)
     return sign_switches, fractions, segment_signs
 end
 
+"""
+    find_neighbors_within_distance(all_x, all_y, d) -> (indices_within_d, dists_within_d)
+
+Given two vectors `all_x` and `all_y` representing 2D point coordinates, and a scalar distance `d` (with units),
+this function identifies all neighboring points within distance `d` of each point using a k-d tree.
+"""
 function find_neighbors_within_distance(all_x, all_y, d)
     # Combine vectors into a 2D points matrix
     points = hcat(all_x, all_y)'

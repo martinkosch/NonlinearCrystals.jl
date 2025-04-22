@@ -41,7 +41,6 @@ metadata = Dict(
     :mohs_hardness => 4,
 )
 ```
-
 2. Principal refractive indices: Specify the valid spectral range of Sellmeier model and add the refractive data as `SellmeierFunction` with a refractive index function and a reference temperature: 
 
 ```julia
@@ -64,7 +63,6 @@ metadata = Dict(
         temp_ref,
     )
 ```
-
 3. The nonlinear susceptibility tensor: 
 The function `d_XYZ_full` lets you compute the full nonlinear tensor in the dielectric frame. Rotations into this frame can be specified as a rotation matrix if needed. See the [file for BIBO](https://github.com/martinkosch/NonlinearCrystals.jl/blob/main/src/crystal_data/bibo.jl) as an example.
 In the present case, `d15` and `d22` are the two non-zero coefficients for BBO's `3m` point group; all other components are set automatically based on the crystal's point group: 
@@ -76,8 +74,7 @@ In the present case, `d15` and `d22` are the two non-zero coefficients for BBO's
     )
 ```
 The full or contracted tensors can in the end be shown using `BBO.d_XYZ_ref_full` or `BBO.d_XYZ_ref`, respectively. 
-
-4. Miller delta: Compute Miller scaling data for corrections of `d_eff` if the wavelengths during the measurements of the specified tensor components are known. For example, if the specified tensor components `d15` and `d22` are known to be measured using the second-harmonic generation of 1064 nm light, calculate the miller delta tensor using: 
+4. Miller delta (optional): Compute Miller scaling data for corrections of `d_eff` if the wavelengths during the measurements of the specified tensor components are known. For example, if the specified tensor components `d15` and `d22` are known to be measured using the second-harmonic generation with a fundamental wavelength of 1064 nm, calculate the miller delta tensor using: 
 ```julia
     miller_delta = calc_miller_delta(
         d_XYZ_full, 
@@ -88,7 +85,6 @@ The full or contracted tensors can in the end be shown using `BBO.d_XYZ_ref_full
         lambda_r2 = 1064u"nm"
     )
 ```
-
 5. Returning the crystal object: Finally, construct and return the actual crystal object:
 ```julia
     BBO = UnidirectionalCrystal(

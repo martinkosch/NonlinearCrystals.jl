@@ -14,7 +14,7 @@ NonlinearCrystals.jl is a Julia package for analyzing and simulating nonlinear o
 ]dev https://github.com/martinkosch/NonlinearCrystals.jl
 ```
 
-This will clone the package locally and tracks its latest development version.
+This will clone the package locally with its latest development version.
 
 ## Current Features
 

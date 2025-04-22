@@ -216,7 +216,7 @@ function refractive_index(
         end
     end
 
-    return uconvert(Unitful.NoUnits, sri.n_fun(lambda, temp))
+    return uconvert(Unitful.NoUnits, sri.n_fun(lambda, temp |> u"K"))
 end
 
 ## Plots

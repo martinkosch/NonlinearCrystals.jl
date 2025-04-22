@@ -16,7 +16,7 @@ This package is not yet registered in the general Julia registry. To install the
 ]dev https://github.com/martinkosch/NonlinearCrystals.jl
 ```
 
-This will clone the package locally and tracks its latest development version.
+This will clone the package locally with its latest development version.
 
 ## Current features
 

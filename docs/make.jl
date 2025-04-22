@@ -18,6 +18,9 @@ makedocs(;
     ),
     pages=[
         "Introduction" => "index.md",
+        "Examples" => [
+            "Visualizing refractive indices" => "examples/vis_refr_indices.md",
+        ],
         "API" => [
             "Refractive Index" => "refractive_index.md",
             "Phasematching" => "phasematching.md",

@@ -754,7 +754,7 @@ function print_refraction_data_header(io::IO, rd::Union{RefractionDataHiLo,Refra
     λ = ustrip.(u"nm", round.(u"nm", rd.lambda; digits))
     @printf(io, "%-25s %s\n", "Wavelength (nm):", λ)
 
-    @printf(io, "%-25s theta: %3.2f°, phi: %3.2f°\n", "k angles:",
+    @printf(io, "%-25s θ: %3.2f°, ϕ: %3.2f°\n", "k angles:",
         ustrip(u"°", rd.theta), ustrip(u"°", rd.phi))
 
     @printf(io, "%-25s %-25s\n", "k direction:",

@@ -45,17 +45,18 @@ using Unitful
 lambda_r1=1064u"nm"
 lambda_r2=532u"nm"
 temp = 293.15u"K"
+hi_or_lo_rrb=[(:hi, :hi, :lo), (:lo, :lo, :hi)]
 
 # Display and plot all possible type I phasematches
-all_pm = NonlinearCrystals.plot_critical_pms(LBO; hi_or_lo_rrb=[(:hi, :hi, :lo), (:lo, :lo, :hi)], lambda_r1, lambda_r2, temp=293u"K")
+all_pm = NonlinearCrystals.plot_critical_pms(LBO; hi_or_lo_rrb, lambda_r1, lambda_r2, temp)
 
-# Visualize critical phase matches
-plot_delta_k_map((:hi, :hi, :lo), LBO; lambda_r1, lambda_r2, temp, plot_type=:sphere)
+# Visualize critical phase matches for (:hi, :hi, :lo)
+plot_delta_k_map(hi_or_lo_rrb[1], LBO; lambda_r1, lambda_r2, temp, plot_type=:sphere)
 
 # Find a specific phasematch
 theta = 90u"°"
 phi = 30u"°"
-julia> pm = find_nearest_pm_along_theta_phi(theta, phi, (:hi, :hi, :lo), LBO; lambda_r1, lambda_r2, temp)
+julia> pm = find_nearest_pm_along_theta_phi(theta, phi, hi_or_lo_rrb[1], LBO; lambda_r1, lambda_r2, temp)
 
 Crystal:                      LBO (Lithium Triborate)
 k angles:                     θ: 90.00°, ϕ: 37.22°

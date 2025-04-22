@@ -19,8 +19,8 @@ This will clone the package locally and tracks its latest development version.
 ## Current Features
 
 - **Refraction modeling** for uniaxial and biaxial nonlinear crystals  
-- Full computation of **group velocities**, **walkoff angles**, and **dispersion terms** 
-- Calculation of **effective nonlinearity** $d_{eff}$ with or without **Miller scaling**
+- Computation of **group velocities**, **walkoff angles**, and **dispersion terms** 
+- Calculation of **effective nonlinearity** $d_\text{eff}$ with or without **Miller scaling**
 - Determination of critical and noncritical **collinear phase-matching** conditions
 - Strict use of **units** based on [Unitful.jl](https://github.com/PainterQubits/Unitful.jl/tree/master)
 - **Visualization tools** for:

@@ -1,4 +1,4 @@
-# NonlinearCrystals
+# NonlinearCrystals.jl
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://martinkosch.github.io/NonlinearCrystals.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://martinkosch.github.io/NonlinearCrystals.jl/dev/)
@@ -10,7 +10,7 @@ NonlinearCrystals.jl is a Julia package for analyzing and simulating nonlinear o
 
 ## Installation
 
-This package is not yet registered in the General Julia Registry. To install the package, clone it using Julia's package manager:
+This package is not yet registered in the general Julia registry. To install the package, clone it using Julia's package manager:
 
 ```julia
 ]dev https://github.com/martinkosch/NonlinearCrystals.jl
@@ -48,9 +48,9 @@ temp = 293.15u"K"
 hi_or_lo_rrb=[(:hi, :hi, :lo), (:lo, :lo, :hi)]
 
 # Display and plot all possible type I phasematches
-all_pm = NonlinearCrystals.plot_critical_pms(LBO; hi_or_lo_rrb, lambda_r1, lambda_r2, temp)
+plot_critical_pms(LBO; hi_or_lo_rrb, lambda_r1, lambda_r2, temp)
 
-# Visualize critical phase matches for (:hi, :hi, :lo)
+# Visualize critical phase matches for (:hi, :hi, :lo); interactive label on mouseover might take a few seconds for precompilation
 plot_delta_k_map(hi_or_lo_rrb[1], LBO; lambda_r1, lambda_r2, temp, plot_type=:sphere)
 
 # Find a specific phasematch
@@ -88,7 +88,7 @@ More examples are available in the examples section.
 
 Development is actively ongoing. Planned features include:
 
-- Improved phasematching and bandwidth **visualizations**
+- Improved **interactive visualizations**
 - **Quasi-phasematching (QPM)** support  
 - 1D and 2D static and transient **simulations** of nonlinear three-wave processes
 - **Non-collinear** phasematches

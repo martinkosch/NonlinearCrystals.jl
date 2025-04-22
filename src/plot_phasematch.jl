@@ -1,4 +1,4 @@
-export calc_noncritical_pm_lines, plot_noncritical_pms, plot_delta_k_map
+export calc_noncritical_pm_lines, plot_critical_pms, plot_noncritical_pms, plot_delta_k_map
 
 function noncritical_pm_label(
     plot,

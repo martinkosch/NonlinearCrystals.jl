@@ -20,6 +20,7 @@ makedocs(;
         "Introduction" => "index.md",
         "Examples" => [
             "Visualizing refractive indices" => "examples/vis_refr_indices.md",
+            "Adding new nonlinear crystals" => "examples/adding_new_crystal.md",
         ],
         "API" => [
             "Refractive Index" => "refractive_index.md",

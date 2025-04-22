@@ -6,11 +6,11 @@
 [![Coverage](https://codecov.io/gh/martinkosch/NonlinearCrystals.jl/graph/badge.svg?token=AVIIA69G5F)](https://codecov.io/gh/martinkosch/NonlinearCrystals.jl)
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
-**NonlinearCrystals.jl** is a Julia package for analyzing and simulating nonlinear optical processes in birefringent crystals. It provides tools for evaluating refractive data, finding phasematches, and generating plots of critical and noncritical phase matches.
+NonlinearCrystals.jl is a Julia package for analyzing and simulating nonlinear optical processes in birefringent crystals. It provides tools for evaluating refractive data, finding phasematches, and generating plots of critical and noncritical phase matches.
 
 ## Installation
 
-`NonlinearCrystals.jl` is not yet registered in the General Julia Registry. To install the package, clone it using Julia's package manager:
+This package is not yet registered in the General Julia Registry. To install the package, clone it using Julia's package manager:
 
 ```julia
 ]dev https://github.com/martinkosch/NonlinearCrystals.jl
@@ -18,7 +18,7 @@
 
 This will clone the package locally and tracks its latest development version.
 
-## Current Features
+## Current features
 
 - **Refraction modeling** for uniaxial and biaxial nonlinear crystals  
 - Full computation of **group velocities**, **walkoff angles**, and **dispersion terms** 
@@ -31,7 +31,7 @@ This will clone the package locally and tracks its latest development version.
   - Various Δk plots for critical phasematches 
   - Noncritical phasematching lines and SHG points
 
-## Example Usage
+## Example usage
 
 You can use the package to inspect the nonlinear and refractive properties of various crystals, find phase-matching directions, and generate interactive plots.
 
@@ -55,9 +55,8 @@ plot_delta_k_map((:hi, :hi, :lo), LBO; lambda_r1, lambda_r2, temp, plot_type=:sp
 # Find a specific phasematch
 theta = 90u"°"
 phi = 30u"°"
-pm = find_nearest_pm_along_theta_phi(theta, phi, (:hi, :hi, :lo), LBO; lambda_r1, lambda_r2, temp)
+julia> pm = find_nearest_pm_along_theta_phi(theta, phi, (:hi, :hi, :lo), LBO; lambda_r1, lambda_r2, temp)
 
-julia> print(pm)
 Crystal:                      LBO (Lithium Triborate)
 k angles:                     θ: 90.00°, ϕ: 37.22°
 k direction:                  [0.796, 0.605, 0.0]      

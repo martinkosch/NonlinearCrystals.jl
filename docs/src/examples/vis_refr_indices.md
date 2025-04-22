@@ -32,7 +32,7 @@ julia> β₂ = β2(LBO.n_X_principal, 1064u"nm", 300u"K")   # Group delay disper
 1.7872825157935612e-26 s^2 m^-1
 ```
 
-All inputs and outputs of NonlinearCrystals.jl have physical units based on Unitful.jl. It is easy to convert those if needed:
+All inputs and outputs of NonlinearCrystals.jl have physical units based on [Unitful.jl](https://github.com/PainterQubits/Unitful.jl/tree/master). It is easy to convert those if needed:
 
 ```julia
 julia> β₂ |> u"fs^2/mm"

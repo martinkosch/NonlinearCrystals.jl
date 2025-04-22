@@ -224,6 +224,41 @@ function calc_noncritical_pm_lines(
     return all_segments_b, all_segments_r, all_cb_intersections, all_cr_intersections
 end
 
+"""
+    setup_click_saver(ax; pick_filter, position_units=nothing, compute_pm)
+
+Adds a left-click handler to the Makie axis `ax` that uses `pick_filter` to select a plot element, 
+optionally transforms the clicked position via `position_units`, and computes a phasematch with `compute_pm`. 
+If successful, the result is pushed to the global `selected_pms` array. Returns nothing.
+"""
+function setup_click_saver(ax; 
+    pick_filter::Function, 
+    position_units::Union{Function, Nothing} = nothing,
+    compute_pm::Function
+)
+    on(events(ax).mousebutton, priority = 2) do event
+        if event.button == Mouse.left && event.action == Mouse.press
+            sc = Makie.get_scene(ax.parent)
+            mp = mouseposition_px(sc)
+            all_plt_ind = Makie.pick_sorted(sc, mp, 10)
+            
+            i = findfirst(pick_filter, all_plt_ind)
+            if !isnothing(i)
+                plt, idx = all_plt_ind[i]
+                pos = Makie.position_on_plot(plt, idx, apply_transform = false)
+                pos = position_units === nothing ? pos : position_units(pos)
+
+                pm = compute_pm(pos)
+                if !isnothing(pm)
+                    push!(selected_pms, pm)
+                    @info "The following phasematch was appended to the global variable `selected_pms` at index $(length(selected_pms)):"
+                    println(pm)
+                end
+            end
+        end
+    end
+end
+
 function plot_single_noncritical_pm!(
     ax::Axis,
     principal_axis::Symbol,
@@ -276,25 +311,15 @@ function plot_single_noncritical_pm!(
     end
 
     # Save on click functionality
-    on(events(ax).mousebutton, priority = 2) do event
-        if event.button == Mouse.left && event.action == Mouse.press
-            sc = Makie.get_scene(ax.parent)
-            mp = mouseposition_px(sc)
-            all_plt_ind = Makie.pick_sorted(sc, mp, 10)
-            i = findfirst(plt_ind->to_value(get(plt_ind[1].attributes, :inspectable, true)), all_plt_ind)
-            if !isnothing(i)
-                plt, idx = all_plt_ind[i]
-                pos = Makie.position_on_plot(plt, idx, apply_transform = false)
-                pos = pos * u"µm"
-                pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_rrb, cr; lambda_r1=pos[2], lambda_b=pos[1], temp, principal_axis, ngrid, tol)
-                if !isnothing(pm)
-                    push!(selected_pms, pm)
-                    @info "The following phasematch was appended to the global variable `selected_pms` at index $(length(selected_pms)):"
-                    println(pm)
-                end
-            end
-        end
-    end
+    setup_click_saver(ax;
+        pick_filter = plt_ind -> to_value(get(plt_ind[1].attributes, :inspectable, true)),
+        position_units = pos -> pos .* u"µm",
+        compute_pm = pos -> find_nearest_pm_along_lambda_r_b(
+            hi_or_lo_rrb, cr; 
+            lambda_r1=pos[2], lambda_b=pos[1], 
+            temp, principal_axis, ngrid, tol
+        )
+    )
 
     [lines!(ax, all_segments_b[i], all_segments_r1[i]; linestyle=hi_or_lo_rrb[1] === :hi ? :dash : :solid, color=COL_R1, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
     [lines!(ax, all_segments_b[i], 1 ./ (1 ./ all_segments_b[i] .- 1 ./ all_segments_r1[i]); linestyle=hi_or_lo_rrb[2] === :hi ? :dash : :solid, color=COL_R2, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear) for i in eachindex(all_segments_b)]
@@ -768,27 +793,15 @@ function plot_polar_contours!(
         )
 
         # Save on click functionality
-        on(events(ax).mousebutton, priority = 2) do event
-            if event.button == Mouse.left && event.action == Mouse.press
-                sc = Makie.get_scene(ax.parent)
-                mp = mouseposition_px(sc)
-                all_plt_ind = Makie.pick_sorted(sc, mp, 10)
-                i = findfirst(plt_ind->plt_ind[1]==cont, all_plt_ind)
-                if !isnothing(i)
-                    plt, idx = all_plt_ind[i]
-                    pos = Makie.position_on_plot(plt, idx, apply_transform = false)
-                    θ_pm = pos[2] * u"°"
-                    ϕ_pm = pos[1] * u"°"
-                    pm = find_nearest_pm_along_theta_phi(θ_pm, ϕ_pm, hi_or_lo_rrb, cr; temp, lambda_r1=lambda_rrb[1], lambda_r2=lambda_rrb[2], lambda_b=lambda_rrb[3])
-                    if !isnothing(pm)
-                        push!(selected_pms, pm)
-                        @info "The following phasematch was appended to the global variable `selected_pms` at index $(length(selected_pms)):"
-                        println(pm)
-                    end
-                end
-            end
-        end
-        
+        setup_click_saver(ax;
+            pick_filter = plt_ind -> plt_ind[1] == cont,
+            position_units = pos -> pos .* u"°",
+            compute_pm = pos -> find_nearest_pm_along_theta_phi(
+                pos[2], pos[1], hi_or_lo_rrb, cr; 
+                temp, lambda_r1=lambda_rrb[1], lambda_r2=lambda_rrb[2], lambda_b=lambda_rrb[3]
+            )
+        )
+
     end
 end
 
@@ -942,26 +955,14 @@ function plot_sphere_contours!(
         )
 
         # Save on click functionality
-        on(events(ax).mousebutton, priority = 2) do event
-            if event.button == Mouse.left && event.action == Mouse.press
-                sc = Makie.get_scene(ax.parent)
-                mp = mouseposition_px(sc)
-                all_plt_ind = Makie.pick_sorted(sc, mp, 10)
-                i = findfirst(plt_ind->plt_ind[1]==cont, all_plt_ind)
-                if !isnothing(i)
-                    plt, idx = all_plt_ind[i]
-                    pos = Makie.position_on_plot(plt, idx, apply_transform = false)
-                    θ_pm = pos[2] * u"°"
-                    ϕ_pm = pos[1] * u"°"
-                    pm = find_nearest_pm_along_theta_phi(θ_pm, ϕ_pm, hi_or_lo_rrb, cr; temp, lambda_r1=lambda_rrb[1], lambda_r2=lambda_rrb[2], lambda_b=lambda_rrb[3])
-                    if !isnothing(pm)
-                        push!(selected_pms, pm)
-                        @info "The following phasematch was appended to the global variable `selected_pms` at index $(length(selected_pms)):"
-                        println(pm)
-                    end
-                end
-            end
-        end
+        setup_click_saver(ax;
+            pick_filter = plt_ind -> plt_ind[1] == cont,
+            position_units = pos -> pos .* u"°",
+            compute_pm = pos -> find_nearest_pm_along_theta_phi(
+                pos[2], pos[1], hi_or_lo_rrb, cr; 
+                temp, lambda_r1=lambda_rrb[1], lambda_r2=lambda_rrb[2], lambda_b=lambda_rrb[3]
+            )
+        )
 
     end
 end

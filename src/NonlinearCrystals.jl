@@ -23,10 +23,6 @@ COL_R2 = to_colormap(:vik10)[8]
 COL_B = to_colormap(:vik10)[3]
 COLORMAP_HEATMAP = :vik
 
-# Global storage
-selected_pms = PhaseMatch[]
-export selected_pms
-
 # Includes
 include("utils.jl")
 include("refractive_index.jl")
@@ -46,5 +42,9 @@ include("crystal_data/lbo.jl")
 include("crystal_data/lnb_c.jl")
 # include("crystal_data/lnb_m.jl") # TODO: Add when data is ready
 include("crystal_data/lnb_s.jl")
+
+# Global storage arrays
+selected_pms = PhaseMatch[]
+export selected_pms
 
 end

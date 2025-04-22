@@ -23,6 +23,10 @@ COL_R2 = to_colormap(:vik10)[8]
 COL_B = to_colormap(:vik10)[3]
 COLORMAP_HEATMAP = :vik
 
+# Global storage
+selected_pms = PhaseMatch[]
+export selected_pms
+
 # Includes
 include("utils.jl")
 include("refractive_index.jl")

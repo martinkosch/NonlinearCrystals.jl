@@ -54,7 +54,7 @@ plot_critical_pms(LBO; hi_or_lo_rrb, lambda_r1, lambda_r2, temp)
 ![Screenshot of all critical phasematches returned by the plot_critical_pms function.](https://github.com/martinkosch/NonlinearCrystals.jl/blob/main/docs/src/lbo_all_pms.png)
 
 It is also possible to visualize the phasematches for a given combination of polarizations on a unit sphere representing possible incidence directions. 
-This plot shows details on the selected critical phasematch as a label on mouseover. This functionalit might take a few seconds for precompilation. 
+This plot shows details on the selected critical phasematch as a label on mouseover. This functionalit might take a few seconds for precompilation. Clicking on a point on the phasematch contour prints the phasematch to the terminal and appends it to the exported global variable `selected_pms`.  
 ```julia
 # Visualize critical phase matches for (:hi, :hi, :lo) on a unit sphere
 plot_delta_k_map(hi_or_lo_rrb[1], LBO; lambda_r1, lambda_r2, temp, plot_type=:sphere)

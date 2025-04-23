@@ -34,7 +34,7 @@ This will clone the package locally with its latest development version.
 
 You can use the package to inspect the nonlinear and refractive properties of various crystals, find phase-matching directions, and generate interactive plots.
 
-For example, to find and analyze a critical type I phasematch for third-harmonic generation of 1064 nm light in LBO, one can first plot all possible critical phasematches:
+For example, to find and analyze a critical phasematch for third-harmonic generation of 1064 nm light in LBO, one can first plot all possible critical phasematches:
 
 ```julia
 using NonlinearCrystals
@@ -46,7 +46,7 @@ lambda_r2=532u"nm"
 temp = 293.15u"K"
 hi_or_lo_rrb=[(:hi, :hi, :lo), (:lo, :lo, :hi)]
 
-# Display and plot all possible type I phasematches
+# Display and plot all possible phasematches with the specified combination of polarizations
 plot_critical_pms(LBO; hi_or_lo_rrb, lambda_r1, lambda_r2, temp)
 ```
 
@@ -91,7 +91,7 @@ d_eff (pm/V):                 -0.704 (w/o Miller scaling: -0.686)
 S₀ × L² (W):                  1.620e+08 (w/o Miller scaling: 1.700e+08)
 ────────────────────────────────────────────────────────────────────────────────────────────────────────
 ```
-More examples are available in the examples section.
+More examples are available in the [examples](https://martinkosch.github.io/NonlinearCrystals.jl/dev/) section.
 
 ## Roadmap
 

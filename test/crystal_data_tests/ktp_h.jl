@@ -33,7 +33,7 @@ using Unitful
 @test isapprox(dn_dtemp(KTP_H.n_Z_principal, 0.5321u"µm", 293u"K"), 4.27e-5u"K^-1", atol=0.1e-5u"K^-1")
 @test isapprox(dn_dtemp(KTP_H.n_Z_principal, 1.0642u"µm", 293u"K"), 3.40e-5u"K^-1", atol=0.1e-5u"K^-1")
 
-# Test sampled phasematches
+# Test sampled phase-matches
 # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
 pm1 = find_nearest_pm_along_theta_phi(90u"°", 24.0u"°", (:lo, :hi, :lo), KTP_H; lambda_r1=1.062u"µm", lambda_b=1.062u"µm" / 2, temp=293u"K") 
 @test all(pm1.pm_type[1].o_or_e_rrb .== (:e, :o, :e))
@@ -49,7 +49,7 @@ pm2 = find_nearest_pm_along_theta_phi(63.2u"°", 90.0u"°", (:lo, :hi, :lo), KTP
 @test isapprox(pm2.theta_pm, 63.2u"°", atol=ustrip(u"rad", 4u"°"))
 @test isapprox(abs(pm2.eff_data.d_eff), 1.81u"pm/V", rtol=0.2) # From SNLO
 
-# Test sampled noncritical phasematches
+# Test sampled noncritical phase-matches
 # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
 pm3s = find_all_ncpm_over_lambda((:lo,:hi,:lo), KTP_H, 47u"°C"; lambda_b=0.4396u"µm", principal_axis=:X)
 @test length(pm3s) == 1

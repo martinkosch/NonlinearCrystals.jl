@@ -14,8 +14,8 @@ using Unitful
 # Test optical axis
 @test isapprox(optical_axis_angle(LNB_M, 0.5321u"µm"), 0.0u"°", atol=ustrip(u"rad", 1u"°")) 
 
-# Test sampled phasematches
+# Test sampled phase-matches
 # TODO
 
-# Test sampled noncritical phasematches
+# Test sampled noncritical phase-matches
 # TODO

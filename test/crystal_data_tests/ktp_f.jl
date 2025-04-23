@@ -36,7 +36,7 @@ using Unitful
 @test isapprox(dn_dtemp(KTP_F.n_Z_principal, 0.5321u"µm", 293u"K"), 4.27e-5u"K^-1", atol=0.1e-5u"K^-1")
 @test isapprox(dn_dtemp(KTP_F.n_Z_principal, 1.0642u"µm", 293u"K"), 3.40e-5u"K^-1", atol=0.1e-5u"K^-1")
 
-# Test sampled phasematches
+# Test sampled phase-matches
 # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
 pm1 = find_nearest_pm_along_theta_phi(90u"°", 24.59u"°", (:lo, :hi, :lo), KTP_F; lambda_r1=1.0642u"µm", lambda_b=0.5321u"µm", temp=293u"K") 
 @test all(pm1.pm_type[1].o_or_e_rrb .== (:e, :o, :e))
@@ -76,7 +76,7 @@ pm5 = find_nearest_pm_along_theta_phi(67.47u"°", 0.0u"°", (:lo, :hi, :lo), KTP
 @test isapprox(pm5.theta_pm, 67.47u"°", atol=ustrip(u"rad", 4u"°"))
 @test isapprox(abs(pm5.eff_data.d_eff), 3.42u"pm/V", rtol=0.2) # From SNLO
 
-# Test sampled noncritical phasematches (from: Handbook of Nonlinear Crystals)
+# Test sampled noncritical phase-matches (from: Handbook of Nonlinear Crystals)
 pm6s = find_all_ncpm_over_lambda((:lo,:hi,:lo), KTP_F, 20u"°C"; lambda_b=0.495u"µm", principal_axis=:Y)
 @test length(pm6s) == 1
 pm6 = pm6s[1]

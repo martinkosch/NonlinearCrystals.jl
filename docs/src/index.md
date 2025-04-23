@@ -4,7 +4,7 @@ CurrentModule = NonlinearCrystals
 
 # NonlinearCrystals.jl
 
-NonlinearCrystals.jl is a Julia package for analyzing and simulating nonlinear optical processes in birefringent crystals. It provides tools for evaluating refractive data, finding phasematches, and generating plots of critical and noncritical phase matches.
+NonlinearCrystals.jl is a Julia package for analyzing and simulating nonlinear optical processes in birefringent crystals. It provides tools for evaluating refractive data, finding phase-matches, and generating interactive plots of critical and noncritical phase-matches.
 
 ## Installation
 
@@ -26,5 +26,5 @@ This will clone the package locally with its latest development version.
 - **Visualization tools** for:
   - Wavelength and temperature-dependent refractive indices
   - Miller scaling of nonlinear coefficients
-  - Various Δk plots for critical phasematches 
-  - Noncritical phasematching lines and SHG points
+  - Various Δk plots for critical phase-matches 
+  - Noncritical phase-matching lines and SHG points

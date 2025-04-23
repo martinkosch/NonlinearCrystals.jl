@@ -31,7 +31,7 @@ using Unitful
 @test isapprox(dn_dtemp(BIBO.n_Z_principal, 1.064u"µm", 293u"K"), -6.8e-6u"K^-1", atol=1.0e-6u"K^-1")
 
 
-# Test sampled phasematches
+# Test sampled phase-matches
 pm1 = find_nearest_pm_along_theta_phi(150.0u"°", 90.0u"°", (:hi, :hi, :lo), BIBO; lambda_r1=0.8u"µm", lambda_b=0.40u"µm", temp=293u"K")
 @test isapprox(pm1.theta_pm, 151.2u"°", atol=ustrip(u"rad", 2u"°")) 
 @test isapprox(pm1.phi_pm, 90.0u"°", atol=ustrip(u"rad", 2u"°")) 
@@ -48,5 +48,5 @@ pm3 = find_nearest_pm_along_theta_phi(11.1u"°", 0.0u"°", (:hi, :hi, :lo), BIBO
 @test isapprox(pm3.phi_pm, 0.0u"°", atol=ustrip(u"rad", 2u"°")) 
 @test isapprox(abs(pm3.eff_data.d_eff), 2.69u"pm/V", rtol=0.2) # From SNLO 
 
-# Test sampled noncritical phasematches
+# Test sampled noncritical phase-matches
 # TODO

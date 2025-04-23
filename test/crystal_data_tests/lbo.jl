@@ -26,7 +26,7 @@ using Unitful
 # Test optical axis
 @test isapprox(optical_axis_angle(LBO, 0.5321u"µm"), 109.2u"°"/2, atol=ustrip(u"rad", 1u"°")) 
 
-# Test sampled phasematches
+# Test sampled phase-matches
 pm1 = find_nearest_pm_along_theta_phi(90u"°", 11.3u"°", (:hi, :hi, :lo), LBO; lambda_r1=1.0642u"µm", lambda_b=0.5321u"µm", temp=293u"K")
 @test all(pm1.pm_type[1].o_or_e_rrb .== (:o, :o, :e))
 @test pm1.pm_type[1].principal_plane == :XY
@@ -77,5 +77,5 @@ pm6 = find_all_pms_along_dimension((:hi, :hi, :lo), LBO; lambda_r1_fixed=1064u"n
 @test isapprox(pm6.phi_pm, 0.0u"°", atol=ustrip(u"rad", 0.1u"°"))
 @test isapprox(abs(pm6.eff_data.d_eff), 0.85u"pm/V", rtol=0.1) # From SNLO
 
-# Test sampled noncritical phasematches
+# Test sampled noncritical phase-matches
 # TODO

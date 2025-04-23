@@ -23,7 +23,7 @@ using Unitful
 # Test optical axis
 @test isapprox(optical_axis_angle(LNB_S, 0.5321u"µm"), 0.0u"°", atol=ustrip(u"rad", 1u"°")) 
 
-# Test sampled phasematches
+# Test sampled phase-matches
 pm1 = find_nearest_pm_along_theta_phi(71.8u"°", 30.0u"°", (:hi, :hi, :lo), LNB_S; lambda_r1=1.118u"µm", lambda_b=0.559u"µm", temp=293u"K")
 @test all(pm1.pm_type[1].o_or_e_rrb .== (:o, :o, :e))
 @test pm1.pm_type[1].principal_plane == :UD
@@ -32,5 +32,5 @@ pm1 = find_nearest_pm_along_theta_phi(71.8u"°", 30.0u"°", (:hi, :hi, :lo), LNB
 @test isapprox(pm1.phi_pm, 30.0u"°", atol=ustrip(u"rad", 1u"°"))
 @test isapprox(abs(pm1.eff_data.d_eff), 4.94u"pm/V", rtol=0.1) # From SNLO
 
-# Test sampled noncritical phasematches 
+# Test sampled noncritical phase-matches 
 # TODO

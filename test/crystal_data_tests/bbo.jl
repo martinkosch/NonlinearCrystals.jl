@@ -21,7 +21,7 @@ using Unitful
 # Test optical axis
 @test isapprox(optical_axis_angle(BBO, 0.5321u"µm"), 0.0u"°", atol=ustrip(u"rad", 1u"°")) 
 
-# Test sampled phasematches 
+# Test sampled phase-matches 
 # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
 # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#nikogosyan91beta
 pm1 = find_nearest_pm_along_theta_phi(48u"°", 90.0u"°", (:o, :o, :e), BBO; lambda_r1=0.5321u"µm", lambda_b=0.26605u"µm", temp=293u"K")

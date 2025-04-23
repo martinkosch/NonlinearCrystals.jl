@@ -153,7 +153,7 @@ end
 """
     calc_noncritical_pm_lines(principal_axis, hi_or_lo_rrb, cr; ...)
 
-Computes the coordinates of Δk = 0 isolines in the λ_b-λ_r1 parameter space where **noncritical phasematching** is achieved
+Computes the coordinates of Δk = 0 isolines in the λ_b-λ_r1 parameter space where **noncritical phase-matching** is achieved
 (i.e., phase matching occurs at fixed propagation direction, along the crystal's `principal_axis`).
 
 Returns:
@@ -184,7 +184,7 @@ function calc_noncritical_pm_lines(
         ngrid
     )
 
-    # If both red waves are polarized equally (type 1 phasematching), the plot lines show a helpful phase match symmetry around the line cont_r_raw = 2 * cont_b_raw
+    # If both red waves are polarized equally (type 1 phase-matching), the plot lines show a helpful phase match symmetry around the line cont_r_raw = 2 * cont_b_raw
     is_type_one = (hi_or_lo_rrb[1] == hi_or_lo_rrb[2])
 
     all_segments_r = []
@@ -228,7 +228,7 @@ end
     setup_click_saver(ax; pick_filter, position_units=nothing, compute_pm)
 
 Adds a left-click handler to the Makie axis `ax` that uses `pick_filter` to select a plot element, 
-optionally transforms the clicked position via `position_units`, and computes a phasematch with `compute_pm`. 
+optionally transforms the clicked position via `position_units`, and computes a phase-match with `compute_pm`. 
 If successful, the result is pushed to the global `selected_pms` array. Returns nothing.
 """
 function setup_click_saver(ax; 
@@ -251,7 +251,7 @@ function setup_click_saver(ax;
                 pm = compute_pm(pos)
                 if !isnothing(pm)
                     push!(selected_pms, pm)
-                    @info "The following phasematch was appended to the global variable `selected_pms` at index $(length(selected_pms)):"
+                    @info "The following phase-match was appended to the global variable `selected_pms` at index $(length(selected_pms)):"
                     println(pm)
                 end
             end
@@ -293,13 +293,13 @@ function plot_single_noncritical_pm!(
         marker_y_r2[] = is_r1 ? [1 / (1 / pos[1] - 1 / pos[2])] : [pos[2]]
 
         pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_rrb, cr; lambda_r1=marker_y_r1[][1], lambda_b=pos[1], temp, principal_axis, ngrid, tol)
-        return "Noncritical phasematch\n" * plot_pm_label(pm)
+        return "Noncritical phase-match\n" * plot_pm_label(pm)
     end
 
     shg_lab = (plot, idx, pos) -> begin
         pos = pos * u"µm"
         pm = find_nearest_pm_along_lambda_r_b(hi_or_lo_rrb, cr; lambda_r1=pos[2], lambda_b=pos[1], temp, principal_axis, ngrid, tol)
-        return "Noncritical phasematch SHG point\n" * plot_pm_label(pm)
+        return "Noncritical phase-match SHG point\n" * plot_pm_label(pm)
     end
 
     vline_clear = (inspector, plot) -> begin
@@ -338,10 +338,10 @@ end
 """
     plot_noncritical_pms(principal_axis, cr; ...)
 
-Generates an interactive plot of all **noncritical phasematching lines** (Δk = 0) in λ_b-λ_r1 space for a given crystal `cr`
+Generates an interactive plot of all **noncritical phase-matching lines** (Δk = 0) in λ_b-λ_r1 space for a given crystal `cr`
 along the selected `principal_axis`.
 
-Each plotted contour represents a set of wavelength triplets (λ_r1, λ_r2, λ_b) that satisfy phasematching without angular adjustment.
+Each plotted contour represents a set of wavelength triplets (λ_r1, λ_r2, λ_b) that satisfy phase-matching without angular adjustment.
 Supports both Type I (equal polarization) and Type II (cross-polarized) combinations.
 
 You can control the polarization combination via `hi_or_lo_rrb`, limit the scan ranges, and adjust the resolution with `ngrid`.
@@ -368,14 +368,14 @@ function plot_noncritical_pms(
         f[1, 1],
         xlabel="λ_b",
         ylabel="λ_r12",
-        title="$(cr.metadata[:description])\nNoncritical phasematches along positive $(principal_axis) axis, temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))", # , polarization directions: $(hi_or_lo_rrb) # TODO: Add lambda names and o/e
+        title="$(cr.metadata[:description])\nNoncritical phase-matches along positive $(principal_axis) axis, temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))", # , polarization directions: $(hi_or_lo_rrb) # TODO: Add lambda names and o/e
         dim1_conversion=uc,
         dim2_conversion=uc,
     )
 
     if isnothing(hi_or_lo_rrb)
         hi_or_lo_rrb = bool_permutations(:hi, :lo, 3)
-        setdiff!(hi_or_lo_rrb, [(:hi, :lo, :lo), (:hi, :lo, :hi), (:lo, :lo, :lo), (:hi, :hi, :hi)]) # Prevent double plotting of Type 2 noncritical phasematches and (usually) unphysical phasematch combinations
+        setdiff!(hi_or_lo_rrb, [(:hi, :lo, :lo), (:hi, :lo, :hi), (:lo, :lo, :lo), (:hi, :hi, :hi)]) # Prevent double plotting of Type 2 noncritical phase-matches and (usually) unphysical phase-match combinations
     elseif typeof(hi_or_lo_rrb) <: NTuple{3,Symbol}
         hi_or_lo_rrb = [hi_or_lo_rrb]
     end
@@ -405,7 +405,7 @@ end
     plot_critical_pms(cr::NonlinearCrystal; kwargs...) -> Figure
 
 Visualizes and compares **critical phase-matching solutions** for a given nonlinear crystal `cr` across all possible
-polarization configurations and propagation directions. This plot gives insight into how the phasematching 
+polarization configurations and propagation directions. This plot gives insight into how the phase-matching 
 characteristics vary with angle for a **fixed wavelength triplet** (λ_r1, λ_r2, λ_b).
 
 Each horizontal segment in the figure corresponds to a distinct type of phase-matching configuration, and
@@ -427,7 +427,7 @@ For each matched solution (Δk = 0), the following attributes are visualized:
 #### Optional Arguments
 - `hi_or_lo_rrb`: One or more polarization configurations (e.g., `(:hi, :hi, :lo)`)
 - `lambda_r1`, `lambda_r2`, `lambda_b`: At least two must be specified, the third is inferred
-- `temp`: Temperature at which to evaluate phasematching
+- `temp`: Temperature at which to evaluate phase-matching
 - `n_points`: Angular resolution
 - `size`: Plot size as a tuple (width, height)
 
@@ -450,7 +450,7 @@ function plot_critical_pms(cr::NonlinearCrystal;
     # Set hi/lo permutations
     if isnothing(hi_or_lo_rrb)
         hi_or_lo_rrb = bool_permutations(:hi, :lo, 3)
-        setdiff!(hi_or_lo_rrb, [(:lo, :lo, :lo), (:hi, :hi, :hi)]) # Remove (usually) unphysical phasematch combinations
+        setdiff!(hi_or_lo_rrb, [(:lo, :lo, :lo), (:hi, :hi, :hi)]) # Remove (usually) unphysical phase-match combinations
     elseif isa(hi_or_lo_rrb, NTuple{3,Symbol})
         hi_or_lo_rrb = [hi_or_lo_rrb]
     end
@@ -719,7 +719,7 @@ function plot_polar_mode(
     f = Figure(; size)
 
     uc = Makie.UnitfulConversion(u"°"; units_in_label=true)
-    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))"
+    cr_info = "$(cr.metadata[:description]), critical phase-matches for temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))"
     lambda_info = "$(round(u"nm", lambda_rrb[1]; digits)) (λ_r1, $(hi_or_lo_rrb[1])) + $(round(u"nm", lambda_rrb[2]; digits)) (λ_r2, $(hi_or_lo_rrb[2])) = $(round(u"nm", lambda_rrb[3]; digits)) (λ_b, $(hi_or_lo_rrb[3]))"
     ax = Axis(
         f[1, 1],
@@ -881,7 +881,7 @@ function plot_sphere_mode(
     size::NTuple{2,Int}=(800, 600),
 )
     f = Figure(; size)
-    cr_info = "$(cr.metadata[:description]), critical phasematches for temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))"
+    cr_info = "$(cr.metadata[:description]), critical phase-matches for temperature: $(round(u"K", temp; digits=3)) ($(round(u"°C", temp; digits=3)))"
     lambda_info = "$(round(u"nm", lambda_rrb[1]; digits)) (λ_r1, $(hi_or_lo_rrb[1])) + $(round(u"nm", lambda_rrb[2]; digits)) (λ_r2, $(hi_or_lo_rrb[2])) = $(round(u"nm", lambda_rrb[3]; digits)) (λ_b, $(hi_or_lo_rrb[3]))"
     ax = Axis3(
         f[1, 1],

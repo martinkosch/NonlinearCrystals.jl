@@ -8,7 +8,8 @@ using Unitful
 @test LNB_C.n_o_principal(default_lambda(LNB_C), default_temp(LNB_C)) > 1
 @test LNB_C.n_e_principal(default_lambda(LNB_C), default_temp(LNB_C)) > 1
 
-# Sample refractive indices (from: Handbook of Nonlinear Crystals)
+# Sample refractive indices 
+# Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
 @test isapprox(LNB_C.n_o_principal(0.43584u"µm", 293u"K"), 2.39276, atol=0.01) 
 @test isapprox(LNB_C.n_o_principal(0.63282u"µm", 293u"K"), 2.28647, atol=0.01) 
 @test isapprox(LNB_C.n_o_principal(3.3913u"µm", 293u"K"), 2.1415, atol=0.01) 

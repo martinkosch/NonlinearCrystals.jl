@@ -65,7 +65,7 @@ end
 
 crystal_system(cr::NonlinearCrystal) = crystal_system(cr.metadata[:point_group])
 
-# From Frits Zernike, John E. Midwinter: Applied Nonlinear Optics
+# Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#zernike06applied
 const SYMMETRY_GROUPS_KLEINMAN = Dict(
     # Pairs of related coefficients based on Kleinman's symmetry conditions and sign relations within each component group 
     "1" => [
@@ -157,8 +157,8 @@ const SYMMETRY_GROUPS_KLEINMAN = Dict(
     "432" => [([], [])],
 )
 
-# From Frits Zernike, John E. Midwinter: Applied Nonlinear Optics
 # Pairs of related coefficients due to the point group and sign relations within each component group 
+# Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#zernike06applied
 const SYMMETRY_GROUPS = Dict(
     "1" => [
         ([:d11], [1]),

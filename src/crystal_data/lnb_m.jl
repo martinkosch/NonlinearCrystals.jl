@@ -9,7 +9,7 @@
 #         :mohs_hardness => 5,
 #     )
 
-#     # Handbook of Nonlinear Crystals
+#     # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
 #     lambda_min = 0.4u"µm"
 #     lambda_max = 5.5u"µm"
 

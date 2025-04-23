@@ -354,6 +354,7 @@ function miller_rescale(
     χ1_r2 = n_r2 .^ 2 .- 1
     χ1_b = n_b .^ 2 .- 1
 
+    # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#zernike06applied
     # Miller’s Rule:
     # χ⁽²⁾ᵢⱼₖ = Δᵢⱼₖ · χ⁽¹⁾ᵢᵢ(ω_b) · χ⁽¹⁾ⱼⱼ(ω_r₁) · χ⁽¹⁾ₖₖ(ω_r₂)
     # where χ⁽¹⁾ₐₐ(ω) = nₐ²(ω) − 1
@@ -391,6 +392,7 @@ function calc_miller_delta(
     χ1_r2 = n_r2 .^ 2 .- 1
     χ1_b = n_b .^ 2 .- 1
 
+    # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#zernike06applied
     # Miller’s Rule:
     # Δᵢⱼₖ = χ⁽²⁾ᵢⱼₖ / (χ⁽¹⁾ᵢᵢ(ω_b) · χ⁽¹⁾ⱼⱼ(ω_r₁) · χ⁽¹⁾ₖₖ(ω_r₂))
     # χ⁽¹⁾ₐₐ(ω) = nₐ²(ω) − 1

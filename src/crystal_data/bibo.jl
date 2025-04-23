@@ -8,47 +8,7 @@ function create_bibo()
         :mohs_hardness => 5,
     )
 
-    # V.Petrov et al., Femtosecond nonlinear frequency conversion based on BiB₃O₆, 2009
-    # lambda_min = 0.286u"µm"
-    # lambda_max = 2.6u"µm"
-
-    # # From: N. Umemura, K. Miyata, K. Kato, New data on the optical properties of BiB3O6, 2006
-    # temp_ref = 293.15u"K"
-    # n_X_principal = SellmeierFunction(
-    #     (λ, T) -> begin
-    #         n_lam = sqrt(3.07403 + 0.03231u"µm^2" / (λ^2 - 0.03163u"µm^2") - 0.013376u"µm^-2" * λ^2)
-    #         dndT = (0.3826u"µm^3" * λ^-3 - 1.0868u"µm^2" * λ^-2 + 2.1546u"µm" * λ^-1 + 3.9343) * 1e-5u"K^-1" *
-    #                (1 - 5.020e-3u"K^-1" * (T - temp_ref))
-    #         return n_lam + dndT * (T - temp_ref)
-    #     end,
-    #     (lambda_min, lambda_max);
-    #     temp_ref,
-    # )
-
-    # n_Y_principal = SellmeierFunction(
-    #     (λ, T) -> begin
-    #         n_lam = sqrt(3.16940 + 0.03717u"µm^2" / (λ^2 - 0.03483u"µm^2") - 0.01827u"µm^-2" * λ^2)
-    #         dndT = (0.6614u"µm^3" * λ^-3 - 1.7119u"µm^2" * λ^-2 + 2.0856u"µm" * λ^-1 + 3.7731) * 1e-5u"K^-1" *
-    #                (1 - 6.664e-3u"K^-1" * (T - temp_ref))
-    #         return n_lam + dndT * (T - temp_ref)
-    #     end,
-    #     (lambda_min, lambda_max);
-    #     temp_ref,
-    # )
-
-    # n_Z_principal = SellmeierFunction(
-    #     (λ, T) -> begin
-    #         n_lam = sqrt(3.6545 + 0.05112u"µm^2" / (λ^2 - 0.03713u"µm^2") - 0.02261u"µm^-2" * λ^2)
-    #         dndT = (0.9861u"µm^3" * λ^-3 - 3.7512u"µm^2" * λ^-2 + 5.5064u"µm" * λ^-1 + 4.6591) * 1e-5u"K^-1" *
-    #                (1 - 11.622e-3u"K^-1" * (T - temp_ref))
-    #         return n_lam + dndT * (T - temp_ref)
-    #     end,
-    #     (lambda_min, lambda_max);
-    #     temp_ref,
-    # )
-
-
-    # From: K. Miyata, N. Umemura, K. Kato, Phase-matched pure χ⁽³⁾ third-harmonic generation in noncentrosymmetric BiB3O6
+    # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#miyata09
     temp_ref = 293.15u"K"
     lambda_min = 0.3263u"µm"
     lambda_max = 3.083u"µm"
@@ -83,7 +43,7 @@ function create_bibo()
         temp_ref,
     )    
 
-    # From: H. Hellwig et al., Linear optical properties of the monoclinic bismuth borate, 2000
+    # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#hellwig00linear
     phi = 47u"°"
     rot_mat = rot_mat_crys_to_diel((:Z, :X, :Y); rotate_about=:X, phi)
     d_XYZ_full = calc_d_XYZ_full(

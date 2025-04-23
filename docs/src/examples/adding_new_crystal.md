@@ -97,5 +97,9 @@ The full or contracted tensors can in the end be shown using `BBO.d_XYZ_ref_full
     return BBO
 ```
 
-It is helpful to add the references to the publications of the used data as comments. 
-Make also sure that the specified data is working as expected by adding a corresponding test file for each new nonlinear crystal. They should be placed in the [crystal data test folder](https://github.com/martinkosch/NonlinearCrystals.jl/tree/main/test/crystal_data_tests). 
+When using data or formulae from publications, it is helpful to reference them in the code using comments. This package uses `DocumenterCitations.jl` to handle the bibtex-based bibliography entries stored in the file [bibliography.bibtex](https://github.com/martinkosch/NonlinearCrystals.jl/tree/main/docs/src/bibliography.bibtex). This file can be extended with additional references. These can be referenced in the code by using the corresponding entry keys embedded in a link to the documentation, for example:
+```julia
+# Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
+```
+
+Also make sure that the specified data is working as expected by adding a corresponding test file for each new nonlinear crystal. They should be placed in the [crystal data test folder](https://github.com/martinkosch/NonlinearCrystals.jl/tree/main/test/crystal_data_tests). 

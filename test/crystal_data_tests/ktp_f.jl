@@ -9,7 +9,8 @@ using Unitful
 @test KTP_F.n_Y_principal(default_lambda(KTP_F), default_temp(KTP_F)) > 1
 @test KTP_F.n_Z_principal(default_lambda(KTP_F), default_temp(KTP_F)) > 1
 
-# Sample refractive indices (from: Handbook of Nonlinear Crystals)
+# Sample refractive indices
+# Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
 @test isapprox(KTP_F.n_X_principal(0.4047u"µm", 293u"K"), 1.8249, atol=0.01)
 @test isapprox(KTP_F.n_X_principal(0.5893u"µm", 293u"K"), 1.7689, atol=0.01)
 @test isapprox(KTP_F.n_X_principal(1.3414u"µm", 293u"K"), 1.7314, atol=0.01)
@@ -35,7 +36,8 @@ using Unitful
 @test isapprox(dn_dtemp(KTP_F.n_Z_principal, 0.5321u"µm", 293u"K"), 4.27e-5u"K^-1", atol=0.1e-5u"K^-1")
 @test isapprox(dn_dtemp(KTP_F.n_Z_principal, 1.0642u"µm", 293u"K"), 3.40e-5u"K^-1", atol=0.1e-5u"K^-1")
 
-# Test sampled phasematches (from: Handbook of Nonlinear Crystals)
+# Test sampled phasematches
+# Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
 pm1 = find_nearest_pm_along_theta_phi(90u"°", 24.59u"°", (:lo, :hi, :lo), KTP_F; lambda_r1=1.0642u"µm", lambda_b=0.5321u"µm", temp=293u"K") 
 @test all(pm1.pm_type[1].o_or_e_rrb .== (:e, :o, :e))
 @test pm1.pm_type[1].principal_plane == :XY

@@ -307,6 +307,7 @@ function optical_axis_angle(
     n_Z = refractive_index(cr.n_Z_principal, lambda, temp)
 
     # TODO: Clean up using matrix notation
+    # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
     if n_X < n_Z
         Vz = asin((n_Z * sqrt(n_Y^2 - n_X^2)) / (n_Y * sqrt(n_Z^2 - n_X^2)))
     else

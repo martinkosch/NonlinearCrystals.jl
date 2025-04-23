@@ -8,7 +8,7 @@ function create_ktp_f()
         :mohs_hardness => 5,
     )
 
-    # From: Handbook of Nonlinear Crystals
+    # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
     lambda_min = 0.35u"µm"
     lambda_max = 4.5u"µm"
     temp_ref = 293.15u"K"
@@ -44,7 +44,6 @@ function create_ktp_f()
     )
 
     d_XYZ_full = calc_d_XYZ_full(metadata[:point_group]; d31=1.95u"pm/V", d32=3.9u"pm/V", d33=15.3u"pm/V")
-    # d_XYZ_full = calc_d_XYZ_full(metadata[:point_group], I(3), false; d31=3.7u"pm/V", d32=2.2u"pm/V", d33=14.6u"pm/V", d15=3.7u"pm/V", d24=1.9u"pm/V")
     
     miller_delta = calc_miller_delta(
         d_XYZ_full, 

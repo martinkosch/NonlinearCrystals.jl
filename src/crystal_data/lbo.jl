@@ -8,7 +8,8 @@ function create_lbo()
         :mohs_hardness => 6,
     )
 
-    # From: Handbook of Nonlinear Crystals and Kato, “Temperature-tuned 90º phase-matching properties of LiB3O5,” IEEE J. 1994
+    # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
+    # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#kato94temperature
     lambda_min = 0.155u"µm"
     lambda_max = 3.2u"µm"
     temp_ref = 293.15u"K"

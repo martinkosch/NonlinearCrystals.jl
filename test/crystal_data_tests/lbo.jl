@@ -9,7 +9,8 @@ using Unitful
 @test LBO.n_Y_principal(default_lambda(LBO), default_temp(LBO)) > 1
 @test LBO.n_Z_principal(default_lambda(LBO), default_temp(LBO)) > 1
 
-# Sample refractive indices (from: Handbook of Nonlinear Crystals)
+# Sample refractive indices
+# Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
 @test isapprox(LBO.n_X_principal(0.2537u"µm", 293u"K"), 1.6335, atol=0.01) 
 @test isapprox(LBO.n_X_principal(0.5321u"µm", 293u"K"), 1.57868, atol=0.01) 
 @test isapprox(LBO.n_X_principal(1.1000u"µm", 293u"K"), 1.56432, atol=0.01) 
@@ -76,5 +77,5 @@ pm6 = find_all_pms_along_dimension((:hi, :hi, :lo), LBO; lambda_r1_fixed=1064u"n
 @test isapprox(pm6.phi_pm, 0.0u"°", atol=ustrip(u"rad", 0.1u"°"))
 @test isapprox(abs(pm6.eff_data.d_eff), 0.85u"pm/V", rtol=0.1) # From SNLO
 
-# Test sampled noncritical phasematches (from: Handbook of Nonlinear Crystals)
+# Test sampled noncritical phasematches
 # TODO

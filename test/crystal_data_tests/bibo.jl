@@ -9,7 +9,8 @@ using Unitful
 @test BIBO.n_Y_principal(default_lambda(BIBO), default_temp(BIBO)) > 1
 @test BIBO.n_Z_principal(default_lambda(BIBO), default_temp(BIBO)) > 1
 
-# Sample refractive indices (K. Miyata, N. Umemura, and K. Kato, Phase-matched pure χ(3) third-harmonic generation in noncentrosymmetric BiB3O6 , Opt. Lett. 34, 500–502 (2009).)
+# Sample refractive indices
+# Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#miyata09
 @test isapprox(BIBO.n_X_principal(0.6328u"µm", 293u"K"), 1.77668, atol=0.01)
 @test isapprox(BIBO.n_X_principal(1.064u"µm", 293u"K"), 1.75752, atol=0.01)
 

@@ -8,7 +8,7 @@ function create_cga()
         :mohs_hardness => 4,
     )
 
-    # From Tamošauskas, Gintaras; Beresnevičius, Gvidas; Gadonas, Darius; Dubietis, Audrius . (2018). Transmittance and phase matching of BBO crystal in the 3−5 μm range and its application for the characterization of mid-infrared laser pulses. Optical Materials Express, 8(6), 1410–. doi:10.1364/ome.8.001410 
+    # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
     lambda_min = 2.4u"µm"
     lambda_max = 18.0u"µm"
     temp_ref = 293u"K"

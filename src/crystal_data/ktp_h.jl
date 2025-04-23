@@ -8,7 +8,7 @@ function create_ktp_h()
         :mohs_hardness => 5,
     )
 
-    # From: Handbook of Nonlinear Crystals
+    # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
     lambda_min = 0.35u"µm"
     lambda_max = 4.5u"µm"
     temp_ref = 293.15u"K"

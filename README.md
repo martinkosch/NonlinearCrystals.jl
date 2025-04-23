@@ -1,6 +1,5 @@
 # NonlinearCrystals.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://martinkosch.github.io/NonlinearCrystals.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://martinkosch.github.io/NonlinearCrystals.jl/dev/)
 [![Build Status](https://github.com/martinkosch/NonlinearCrystals.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/martinkosch/NonlinearCrystals.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/martinkosch/NonlinearCrystals.jl/graph/badge.svg?token=AVIIA69G5F)](https://codecov.io/gh/martinkosch/NonlinearCrystals.jl)

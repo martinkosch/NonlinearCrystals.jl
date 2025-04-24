@@ -1,6 +1,8 @@
 # Adding a new nonlinear crystal
 
-To define a new nonlinear crystal in NonlinearCrystals.jl, you should to:
+This package becomes more useful as more nonlinear crystal data is added. Contributions to expand the crystal database are highly welcome!
+ 
+To define a new nonlinear crystal in NonlinearCrystals.jl, you need to:
 
 1. Provide metadata such as name, formula, symmetry group, and lattice parameters.
 2. Define its principal refractive indices using a `SellmeierFunction` for each crystal axis.

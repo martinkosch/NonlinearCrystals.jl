@@ -68,6 +68,25 @@ GDD (fs²/mm):             896.823                   825.030
 TOD (fs³/mm):             544.009                   489.841
 ```
 
+The output has the following entries:
+
+| **Field**                     | **Description** |
+|------------------------------|-----------------|
+| **Crystal**                  | Name and composition of the nonlinear crystal. |
+| **Wavelength (nm)**          | Wavelength of light for which refractive indices are computed. |
+| **k angles**                 | Polar (θ) and azimuthal (ϕ) angles in degrees, specifying the propagation direction of the wavevector **k**. |
+| **k direction**              | Cartesian unit vector of the wavevector direction in the dielectric crystal frame. |
+| **Temperature**              | Temperature at which refractive properties are computed. |
+| **Refractive index type**    | **hi** and **lo** refer to the higher and lower refractive indices at the given angle. In certain cases (unidirectional crystals like LNB or when **k** lies within one of the principal planes), **hi** and **lo** can be assigned to the ordinary and extraordinary polarizations often referred to in textbooks. 
+| **Phase velocity / c₀**      | Speed of the phase front relative to the speed of light in vacuum or refractive index. |
+| **Group velocity / c₀**      | Speed of the pulse envelope relative to the speed of light in vacuum or group velocity index.|
+| **Walkoff angle (mrad)**     | Angle between the Poynting vector **S** and the wavevector **k**. Characterizes spatial walkoff between the polarizations. |
+| **S direction**              | Direction of the Poynting vector (energy flow) for each polarization. |
+| **E direction**              | Electric field direction (polarization vector) for each mode. ± indicates that the handedness/phase is not defined here. **E** is perpendicular to the corresponding **S direction** |
+| **D direction**              | Electric displacement direction, which lies in the index ellipsoid surface and is perpendicular to **k**. |
+| **GDD (fs²/mm)**             | Group delay dispersion (or second-order dispersion) per unit length. |
+| **TOD (fs³/mm)**             | Third-order dispersion per unit length. |
+
 ## Plotting refractive index vs. wavelength
 You can visualize the dispersion behavior using:
 ```julia

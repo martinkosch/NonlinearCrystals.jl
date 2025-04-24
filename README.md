@@ -34,8 +34,7 @@ This will clone the package locally with its latest development version.
 
 You can use the package to inspect the nonlinear and refractive properties of various crystals, find phase-matching directions, and generate interactive plots.
 
-For example, to find and analyze a critical phase-match for third-harmonic generation of 1064 nm light in LBO, one can first plot all possible critical phase-matches:
-
+For example, to find critical phase-matches for third-harmonic generation of 1064 nm light in LBO for certain polarization settings, one can first plot an overview of all possible critical phase-matches. In the following plot, those are plotted in a arbitrary order along the x axis. Important properties of the phasematches are shown on the different y axes:
 ```julia
 using NonlinearCrystals
 using Unitful
@@ -53,7 +52,9 @@ plot_critical_pms(LBO; hi_or_lo_rrb, lambda_r1, lambda_r2, temp)
 ![Screenshot of all critical phase-matches returned by the plot_critical_pms function.](https://github.com/martinkosch/NonlinearCrystals.jl/blob/main/docs/src/lbo_all_pms.png)
 
 It is also possible to visualize the phase-matches for a given combination of polarizations on a unit sphere representing possible incidence directions. 
-This plot shows details on the selected critical phase-match as a label on mouseover. This functionality might take a few seconds for precompilation. Clicking on a point on the phase-match contour prints the phase-match to the terminal and appends it to the exported global variable `selected_pms` for later use.  
+This plot shows details on the selected critical phase-match as a label on mouseover. This functionality might take a few seconds for precompilation. 
+
+Clicking on a point on the phase-match contour prints the phase-match to the terminal and appends it to the exported global variable `selected_pms` for later use.  
 ```julia
 # Visualize critical phase-matches for (:hi, :hi, :lo) on a unit sphere
 plot_delta_k_map(hi_or_lo_rrb[1], LBO; lambda_r1, lambda_r2, temp, plot_type=:sphere)

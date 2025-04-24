@@ -72,8 +72,8 @@ The output has the following entries:
 
 | **Field**                     | **Description** |
 |------------------------------|-----------------|
-| **Crystal**                  | Name and composition of the nonlinear crystal. |
-| **Wavelength (nm)**          | Wavelength of light for which refractive indices are computed. |
+| **Crystal**                  | Description of the nonlinear crystal. |
+| **Wavelength**          | Wavelength of light for which refractive indices are computed. |
 | **k angles**                 | Polar (θ) and azimuthal (ϕ) angles in degrees, specifying the propagation direction of the wavevector **k**. |
 | **k direction**              | Cartesian unit vector of the wavevector direction in the dielectric crystal frame. |
 | **Temperature**              | Temperature at which refractive properties are computed. |

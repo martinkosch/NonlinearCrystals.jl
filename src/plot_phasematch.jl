@@ -413,9 +413,9 @@ the plot shows how key quantities vary along that solution contour (i.e., as a f
 
 #### Plotted Quantities per Phasematch
 For each matched solution (Δk = 0), the following attributes are visualized:
-- **Phase velocity / c₀** — the normalized refractive indices (n)
-- **Group velocity / c₀** — inverse group indices (group velocity dispersion)
-- **GDD** — group delay dispersion (β₂), unit: fs²/mm
+- **Refractive index** 
+- **Group index** 
+- **β₂** — group velocity dispersion, unit: fs²/mm
 - **Walkoff angle** — spatial beam walkoff, unit: mrad
 - **ω BW × L** — angular frequency bandwidth product (Δω·L), from group velocity mismatch
 - **T BW × L** — temperature tolerance (ΔT·L), from thermal dispersion mismatch
@@ -488,9 +488,9 @@ function plot_critical_pms(cr::NonlinearCrystal;
 
     # Set up data, units, and data sources
     axis_data = [
-        ("Phase vel. / c₀", nothing, nothing, pm -> pm.n_rrb),
-        ("Group vel. / c₀", nothing, nothing, pm -> pm.group_index_rrb),
-        ("GDD", u"fs^2/mm", nothing, pm -> pm.beta2_rrb),
+        ("Refractive index", nothing, nothing, pm -> pm.n_rrb),
+        ("Group index", nothing, nothing, pm -> pm.group_index_rrb),
+        ("β₂", u"fs^2/mm", nothing, pm -> pm.beta2_rrb),
         ("Walkoff angle", u"mrad", nothing, pm -> pm.walkoff_angle_rrb),
         ("ω BW × L", u"GHz * cm", (0u"GHz * cm", 1000u"GHz * cm"), pm -> pm.bw_data.omega_L_bw),
         ("T BW × L", u"K * cm", (0u"K * cm", 100u"K * cm"), pm -> pm.bw_data.temp_L_bw),

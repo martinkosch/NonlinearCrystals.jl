@@ -317,9 +317,9 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     end
 
     # Index summary
-    @printf(io, "%-29s %-25s %-25s %-25s\n", "Phase velocity / c₀:",
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "Refractive index:",
         auto_fmt.(cpm.n_rrb; digits)...)
-    @printf(io, "%-29s %-25s %-25s %-25s\n", "Group velocity / c₀:",
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "Group index:",
         auto_fmt.(cpm.group_index_rrb; digits)...)
 
     # Walkoff
@@ -332,11 +332,11 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     @printf(io, "%-29s %-25s %-25s %-25s\n", "D direction:", vec_str.(cpm.D_dir_rrb)...)
 
     # Dispersion
-    gdd = auto_fmt.(ustrip.(u"fs^2/mm", cpm.beta2_rrb); digits)
+    gvd = auto_fmt.(ustrip.(u"fs^2/mm", cpm.beta2_rrb); digits)
     tod = auto_fmt.(ustrip.(u"fs^3/mm", cpm.beta3_rrb); digits)
-    @printf(io, "%-29s %-25s %-25s %-25s\n", "GDD (fs²/mm):", gdd...)
-    @printf(io, "%-29s %-25s %-25s %-25s\n", "TOD (fs³/mm):", tod...)
-
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "β₂ (fs²/mm):", gvd...)
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "β₃ (fs³/mm):", tod...)
+    
     # Bandwidths
     ωbw = auto_fmt.(ustrip.(u"GHz*cm", round.(u"GHz*cm", cpm.bw_data.omega_L_bw; digits)))
     @printf(io, "%-29s %-25s %-25s %-25s\n", "ω BW × L (GHz·cm):", ωbw...)

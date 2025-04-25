@@ -75,14 +75,14 @@ Temperature:                  293.15 K (20.00 °C)
 Wavelength (nm):              1064.0                    532.0                     354.667                  
 Refractive index type:        hi                        hi                        lo                       
 Type I PM in XY plane:        o                         o                         e                        
-Phase velocity / c₀:          1.605                     1.622                     1.616                    
-Group velocity / c₀:          1.626                     1.656                     1.690                    
+Refractive index:             1.605                     1.622                     1.616                    
+Group index:                  1.626                     1.656                     1.690                    
 Walkoff angle (mrad):         0.000                     0.000                     18.070                   
 S direction:                  [0.796, 0.605, 0.0]       [0.796, 0.605, 0.0]       [0.807, 0.59, 0.0]       
 E direction:                  [-0.0, -0.0, 1.0]         [-0.0, -0.0, 1.0]         [0.59, -0.807, 0.0]      
 D direction:                  [-0.0, -0.0, 1.0]         [-0.0, -0.0, 1.0]         [0.605, -0.796, 0.0]     
-GDD (fs²/mm):                 16.592                    89.684                    153.153                  
-TOD (fs³/mm):                 70.119                    35.846                    46.928                   
+β₂ (fs²/mm):                  16.592                    89.684                    153.153                  
+β₃ (fs³/mm):                  70.119                    35.846                    46.928                   
 ω BW × L (GHz·cm):            872.759                   464.602                   993.454                  
 T BW × L (K·cm):              20.621                   
 θ BW × L (mrad·cm):           Inf                      

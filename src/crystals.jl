@@ -410,8 +410,8 @@ function Base.show(io::IO, rd::RefractionDataHiLo)
     rd_hi = RefractionData(:hi, rd)
     rd_lo = RefractionData(:lo, rd)
 
-    @printf(io, "%-25s %-25s %-25s\n", "Phase velocity / c₀:", auto_fmt(rd_hi.n; digits), auto_fmt(rd_lo.n; digits))
-    @printf(io, "%-25s %-25s %-25s\n", "Group velocity / c₀:", auto_fmt(rd_hi.group_index), auto_fmt(rd_lo.group_index))
+    @printf(io, "%-25s %-25s %-25s\n", "Refractive index:", auto_fmt(rd_hi.n; digits), auto_fmt(rd_lo.n; digits))
+    @printf(io, "%-25s %-25s %-25s\n", "Group index:", auto_fmt(rd_hi.group_index), auto_fmt(rd_lo.group_index))
     @printf(io, "%-25s %-25s %-25s\n", "Walkoff angle (mrad):",
         auto_fmt(ustrip(u"mrad", rd_hi.walkoff_angle); digits),
         auto_fmt(ustrip(u"mrad", rd_lo.walkoff_angle); digits),
@@ -419,11 +419,11 @@ function Base.show(io::IO, rd::RefractionDataHiLo)
     @printf(io, "%-25s %-25s %-25s\n", "S direction:", vec_str(rd_hi.S_dir), vec_str(rd_lo.S_dir))
     @printf(io, "%-24s %-25s %-25s\n", "E direction:", "±" * vec_str(rd_hi.E_dir), "±" * vec_str(rd_lo.E_dir))
     @printf(io, "%-24s %-25s %-25s\n", "D direction:", "±" * vec_str(rd_hi.D_dir), "±" * vec_str(rd_lo.D_dir))
-    @printf(io, "%-25s %-25s %-25s\n", "GDD (fs²/mm):",
+    @printf(io, "%-25s %-25s %-25s\n", "β₂ (fs²/mm):",
         auto_fmt(ustrip(u"fs^2/mm", rd_hi.beta2); digits),
         auto_fmt(ustrip(u"fs^2/mm", rd_lo.beta2); digits),
     )
-    @printf(io, "%-25s %-25s %-25s\n", "TOD (fs³/mm):",
+    @printf(io, "%-25s %-25s %-25s\n", "β₃ (fs³/mm):",
         auto_fmt(ustrip(u"fs^3/mm", rd_hi.beta3); digits),
         auto_fmt(ustrip(u"fs^3/mm", rd_lo.beta3); digits),
     )
@@ -731,18 +731,18 @@ function Base.show(io::IO, rd::RefractionData)
         end
     end
 
-    @printf(io, "%-25s %-25s\n", "Phase velocity / c₀:", auto_fmt(rd.n; digits))
-    @printf(io, "%-25s %-25s\n", "Group velocity / c₀:", auto_fmt(rd.group_index))
+    @printf(io, "%-25s %-25s\n", "Refractive index:", auto_fmt(rd.n; digits))
+    @printf(io, "%-25s %-25s\n", "Group index:", auto_fmt(rd.group_index))
     @printf(io, "%-25s %-25s\n", "Walkoff angle (mrad):",
         auto_fmt(ustrip(u"mrad", rd.walkoff_angle); digits),
     )
     @printf(io, "%-25s %-25s\n", "S direction:", vec_str(rd.S_dir))
     @printf(io, "%-24s %-25s\n", "E direction:", "±" * vec_str(rd.E_dir))
     @printf(io, "%-24s %-25s\n", "D direction:", "±" * vec_str(rd.D_dir))
-    @printf(io, "%-25s %-25s\n", "GDD (fs²/mm):",
+    @printf(io, "%-25s %-25s\n", "β₂ (fs²/mm):",
         auto_fmt(ustrip(u"fs^2/mm", rd.beta2); digits),
     )
-    @printf(io, "%-25s %-25s\n", "TOD (fs³/mm):",
+    @printf(io, "%-25s %-25s\n", "β₃ (fs³/mm):",
         auto_fmt(ustrip(u"fs^3/mm", rd.beta3); digits),
     )
 end

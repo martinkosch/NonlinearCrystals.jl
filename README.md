@@ -9,13 +9,11 @@ NonlinearCrystals.jl is a Julia package for analyzing and simulating nonlinear o
 
 ## Installation
 
-This package is not yet registered in the general Julia registry. To install the package, clone it using Julia's package manager:
+This package is registered in the general Julia registry. To install the package, use Julia's package manager:
 
 ```julia
-]dev https://github.com/martinkosch/NonlinearCrystals.jl
+pkg> add NonlinearCrystals
 ```
-
-This will clone the package locally with its latest development version.
 
 ## Current features
 

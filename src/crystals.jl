@@ -569,9 +569,9 @@ function calc_E_dir_S_dir(
 
     # Calculate Poynting vectors and walkoff k polar angles
     S_dir_hi = normalize(cross(E_dir_hi_lo[1], H_dir_hi_lo[1]))
-    S_dir_hi = sign(dot(S_dir_hi, k_dir)) * S_dir_hi # Let S and k point have the same orientation
+    S_dir_hi = sign(dot(S_dir_hi, k_dir)) * S_dir_hi # Let S and k have the same orientation
     S_dir_lo = normalize(cross(E_dir_hi_lo[2], H_dir_hi_lo[2]))
-    S_dir_lo = sign(dot(S_dir_lo, k_dir)) * S_dir_lo # Let S and k point have the same orientation
+    S_dir_lo = sign(dot(S_dir_lo, k_dir)) * S_dir_lo # Let S and k have the same orientation
     S_dir_hi_lo = (S_dir_hi, S_dir_lo)
 
     return E_dir_hi_lo, S_dir_hi_lo

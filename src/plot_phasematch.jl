@@ -248,7 +248,7 @@ function setup_click_saver(ax;
                 pos = Makie.position_on_plot(plt, idx, apply_transform = false)
                 pos = position_units === nothing ? pos : position_units(pos)
 
-                pm = compute_pm(pos)
+                pm = compute_pm(pos, idx)
                 if !isnothing(pm)
                     push!(selected_pms, pm)
                     @info "The following phase-match was appended to the global variable `selected_pms` at index $(length(selected_pms)):"
@@ -314,7 +314,7 @@ function plot_single_noncritical_pm!(
     setup_click_saver(ax;
         pick_filter = plt_ind -> to_value(get(plt_ind[1].attributes, :inspectable, true)),
         position_units = pos -> pos .* u"µm",
-        compute_pm = pos -> find_nearest_pm_along_lambda_r_b(
+        compute_pm = (pos, idx) -> find_nearest_pm_along_lambda_r_b(
             hi_or_lo_rrb, cr; 
             lambda_r1=pos[2], lambda_b=pos[1], 
             temp, principal_axis, ngrid, tol
@@ -435,7 +435,8 @@ For each matched solution (Δk = 0), the following attributes are visualized:
 Returns a vertically stacked GLMakie `Figure` containing multiple linked plots, each showing one of the quantities above.
 Each horizontal span corresponds to a continuous critical phase-matching curve (i.e., varying θ and ϕ for fixed λ and T).
 """
-function plot_critical_pms(cr::NonlinearCrystal;
+function plot_critical_pms(
+    cr::NonlinearCrystal;
     hi_or_lo_rrb::Union{NTuple{3,Symbol},AbstractVector{<:NTuple{3,Symbol}},Nothing}=nothing,
     lambda_r1::Union{Nothing,Length}=nothing,
     lambda_r2::Union{Nothing,Length}=nothing,
@@ -512,9 +513,17 @@ function plot_critical_pms(cr::NonlinearCrystal;
         for (i, ad) in enumerate(axis_data)
     ]
 
+    [DataInspector(ax) for ax in axes[1:end-1]]
     foreach(hidexdecorations!, axes[1:end-1])
     hidedecorations!(axes[end])
     linkxaxes!(axes)
+
+    vline_clear = (inspector, plot) -> begin
+        marker_x[] = [NaN]
+        return nothing
+    end
+
+    marker_x = Observable([NaN])
 
     # Plot data
     start = 0
@@ -528,17 +537,30 @@ function plot_critical_pms(cr::NonlinearCrystal;
             extr = axis_data[i][4]
             isnothing(extr) && continue
             data = [extr(pm) for pm in l]
+            vline_lab = (plot, index, position) -> plot_pm_label(l[index])
+
+            vline_lab = (plot, idx, pos) -> begin
+                marker_x[] = [pos[1]]
+                return plot_pm_label(l[idx])
+            end
+
+            # Save on click functionality
+            setup_click_saver(ax;
+                pick_filter = plt_ind -> to_value(get(plt_ind[1].attributes, :inspectable, true)),
+                compute_pm = (pos, idx) -> l[idx]
+            )
+
             if length(data[1]) == 3
                 for (comp, col) in zip(1:3, [COL_R1, COL_R2, COL_B])
-                    lines!(ax, idx_range, getindex.(data, comp), color=col, linewidth=2)
+                    lines!(ax, idx_range, getindex.(data, comp), color=col, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear)
                 end
             else
-                lines!(ax, idx_range, data, linewidth=2)
+                lines!(ax, idx_range, data, linewidth=2, inspectable=true, inspector_label=vline_lab, inspector_clear=vline_clear)
             end
         end
 
         # Type labels
-        vspan!(axes[end], [start], [start + length(l) - 1])
+        vspan!(axes[end], [start], [start + length(l) - 1], inspectable=false)
 
         label_text = if isa(cr, UnidirectionalCrystal)
             types = l[1].pm_data.pm_type[1]
@@ -551,6 +573,8 @@ function plot_critical_pms(cr::NonlinearCrystal;
 
         start += length(l) + 30
     end
+
+    [vlines!(ax, marker_x; inspectable=false, color=:gray, linewidth=2, alpha=0.5) for ax in axes[1:end-1]]
 
     # Restrict automatic y axis limits to specified limits 
     for hl in all_pm, l in hl
@@ -796,7 +820,7 @@ function plot_polar_contours!(
         setup_click_saver(ax;
             pick_filter = plt_ind -> plt_ind[1] == cont,
             position_units = pos -> pos .* u"°",
-            compute_pm = pos -> find_nearest_pm_along_theta_phi(
+            compute_pm = (pos, idx) -> find_nearest_pm_along_theta_phi(
                 pos[2], pos[1], hi_or_lo_rrb, cr; 
                 temp, lambda_r1=lambda_rrb[1], lambda_r2=lambda_rrb[2], lambda_b=lambda_rrb[3]
             )
@@ -958,7 +982,7 @@ function plot_sphere_contours!(
         setup_click_saver(ax;
             pick_filter = plt_ind -> plt_ind[1] == cont,
             position_units = pos -> pos .* u"°",
-            compute_pm = pos -> find_nearest_pm_along_theta_phi(
+            compute_pm = (pos, idx) -> find_nearest_pm_along_theta_phi(
                 pos[2], pos[1], hi_or_lo_rrb, cr; 
                 temp, lambda_r1=lambda_rrb[1], lambda_r2=lambda_rrb[2], lambda_b=lambda_rrb[3]
             )

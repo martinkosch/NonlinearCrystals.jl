@@ -50,7 +50,7 @@ the polarization of each wave (`:o` or `:e`), and a human-readable type classifi
 Used for diagnostic purposes and auto-labeling of phase-match types.
 """
 struct PMType
-    principal_plane::Union{Symbol}
+    principal_plane::Symbol
     o_or_e_rrb::NTuple{3,Symbol}
     type::String
 end
@@ -246,10 +246,8 @@ function CollinearPhaseMatch(
         hi_or_lo_rrb = hi_or_lo_rrb[[2, 1, 3]]
     end
 
-    rd_r1 = RefractionData(hi_or_lo_rrb[1], theta_pm, phi_pm, cr, lambda_rrb[1]; temp)
-    rd_r2 = RefractionData(hi_or_lo_rrb[2], theta_pm, phi_pm, cr, lambda_rrb[2]; temp)
-    rd_b = RefractionData(hi_or_lo_rrb[3], theta_pm, phi_pm, cr, lambda_rrb[3]; temp)
-    refr_data = PMRefractionData(rd_r1, rd_r2, rd_b)
+    rd_rrb = [RefractionData(hi_or_lo_rrb[i], theta_pm, phi_pm, cr, lambda_rrb[i]; temp) for i in eachindex(lambda_rrb)]
+    refr_data = PMRefractionData(rd_rrb...)
 
     pm_data = PMCollinearData(refr_data, hi_or_lo_rrb, theta_pm, phi_pm, cr, lambda_rrb, temp; angle_tol)
 
@@ -336,7 +334,7 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     tod = auto_fmt.(ustrip.(u"fs^3/mm", cpm.beta3_rrb); digits)
     @printf(io, "%-29s %-25s %-25s %-25s\n", "β₂ (fs²/mm):", gvd...)
     @printf(io, "%-29s %-25s %-25s %-25s\n", "β₃ (fs³/mm):", tod...)
-    
+
     # Bandwidths
     ωbw = auto_fmt.(ustrip.(u"GHz*cm", round.(u"GHz*cm", cpm.bw_data.omega_L_bw; digits)))
     @printf(io, "%-29s %-25s %-25s %-25s\n", "ω BW × L (GHz·cm):", ωbw...)
@@ -351,21 +349,21 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
         auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", cpm.bw_data.phi_L_bw; digits))))
 
     # Efficiency
-    @printf(io, "%-29s %-25s\n", 
+    @printf(io, "%-29s %-25s\n",
         "d_eff (pm/V):",
-        auto_fmt(ustrip(u"pm/V", round(u"pm/V", cpm.eff_data.d_eff; digits))) * 
-        " (w/o Miller scaling: " * 
-        auto_fmt(ustrip(u"pm/V", round(u"pm/V", cpm.eff_data.d_eff_no_miller; digits))) * 
+        auto_fmt(ustrip(u"pm/V", round(u"pm/V", cpm.eff_data.d_eff; digits))) *
+        " (w/o Miller scaling: " *
+        auto_fmt(ustrip(u"pm/V", round(u"pm/V", cpm.eff_data.d_eff_no_miller; digits))) *
         ")"
     )
 
-    @printf(io, "%-29s %-25s\n", 
-            "S₀ × L² (W):",
-            auto_fmt(ustrip(u"W", round(u"W", cpm.eff_data.S0_Lsquared; sigdigits=digits))) * 
-            " (w/o Miller scaling: " * 
-            auto_fmt(ustrip(u"W", round(u"W", cpm.eff_data.S0_Lsquared_no_miller; sigdigits=digits))) *
-            ")"
-        )
+    @printf(io, "%-29s %-25s\n",
+        "S₀ × L² (W):",
+        auto_fmt(ustrip(u"W", round(u"W", cpm.eff_data.S0_Lsquared; sigdigits=digits))) *
+        " (w/o Miller scaling: " *
+        auto_fmt(ustrip(u"W", round(u"W", cpm.eff_data.S0_Lsquared_no_miller; sigdigits=digits))) *
+        ")"
+    )
 
     println(io, "────────────────────────────────────────────────────────────────────────────────────────────────────────")
 end

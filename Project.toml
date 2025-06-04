@@ -1,7 +1,7 @@
 name = "NonlinearCrystals"
 uuid = "a311efd2-96b4-40e8-a1fa-502ca2bf329b"
 authors = ["Martin Kosch <martin.kosch@gmail.com> and contributors"]
-version = "0.1.1"
+version = "0.2.0"
 
 [deps]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"

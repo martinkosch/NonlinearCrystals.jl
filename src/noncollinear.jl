@@ -1,0 +1,363 @@
+export delta_k_noncollinear, NoncollinearPhaseMatch
+
+struct PMNoncollinearData{CT<:NonlinearCrystal}
+    hi_or_lo_rrb::NTuple{3,Symbol}
+    pm_type::NTuple{2,Union{Nothing,PMType}}
+    theta_pm_rrb::NTuple{3,typeof(1.0u"rad")}
+    phi_pm_rrb::NTuple{3,typeof(1.0u"rad")}
+    cr::CT
+    lambda_rrb::NTuple{3,typeof(1.0u"m")}
+    temp::typeof(1.0u"K")
+end
+
+function PMNoncollinearData(
+    refr_data::PMRefractionData,
+    hi_or_lo_rrb::NTuple{3,Symbol},
+    theta_pm_rrb::NTuple{3,Angle},
+    phi_pm_rrb::NTuple{3,Angle},
+    cr::NonlinearCrystal,
+    lambda_rrb::NTuple{3,Length},
+    temp::Temperature;
+    angle_tol::Angle=0.1u"°",
+)
+    if isa(cr, UnidirectionalCrystal)
+        # o and e are valid classifiers for UnidirectionalCrystal even if propagating outside of the pricipal planes
+        pm_type = (PMType(:UD, refr_data), nothing)
+    else
+        principal_planes_rrb = [find_principal_planes(theta_pm_rrb[i], phi_pm_rrb[i]; angle_tol) for i in eachindex(lambda_rrb)]
+        @show principal_planes_rrb
+
+        # Only return principal plane if it is identical for all wavelengths
+        common(x) = all(x .== x[begin]) ? x[begin] : nothing 
+        principal_planes = (common([p[i] for p in principal_planes_rrb]) for i in eachindex(principal_planes_rrb[1]))
+
+        pm_type = Tuple((isnothing(p) ? nothing : PMType(p, refr_data) for p in principal_planes)) 
+    end
+
+    return PMNoncollinearData{typeof(cr)}(
+        hi_or_lo_rrb,
+        pm_type,
+        theta_pm_rrb,
+        phi_pm_rrb,
+        cr,
+        lambda_rrb,
+        temp,
+    )
+end
+
+function PMEfficiencyData(pm_data::PMNoncollinearData, refr_data::PMRefractionData)
+    d_eff = calc_d_eff(pm_data.cr, refr_data.E_dir_rrb...; lambda_rrb=pm_data.lambda_rrb, temp=pm_data.temp, use_miller_scaling=true)
+    d_eff_no_miller = calc_d_eff(pm_data.cr, refr_data.E_dir_rrb...; lambda_rrb=pm_data.lambda_rrb, temp=pm_data.temp, use_miller_scaling=false)
+    S_0_Lsquared = (ε_0 * c_0 * pm_data.lambda_rrb[1] * pm_data.lambda_rrb[2] * prod(refr_data.n_rrb)) / (8 * π^2 * d_eff^2)
+    S_0_Lsquared_no_miller = (ε_0 * c_0 * pm_data.lambda_rrb[1] * pm_data.lambda_rrb[2] * prod(refr_data.n_rrb)) / (8 * π^2 * d_eff_no_miller^2)
+    return PMEfficiencyData(
+        d_eff,
+        d_eff_no_miller,
+        S_0_Lsquared,
+        S_0_Lsquared_no_miller,
+    )
+end
+
+function PMBandwidthData(pm_data::PMNoncollinearData, refr_data::PMRefractionData)
+    omega_L_bw = lambda_L_bandwidths(refr_data) # TODO: This is possibly slightly wrong if the formula for collinear phase-matches is used
+    temp_L_bw = temperature_L_bandwidth(pm_data)
+    theta_L_bw = theta_L_bandwidth(pm_data)
+    phi_L_bw = phi_L_bandwidth(pm_data)
+    return PMBandwidthData(
+        omega_L_bw,
+        temp_L_bw,
+        theta_L_bw,
+        phi_L_bw,
+    )
+end
+
+struct NoncollinearPhaseMatch{CT<:NonlinearCrystal} <: PhaseMatch
+    refr_data::PMRefractionData
+    pm_data::PMNoncollinearData{CT}
+    eff_data::PMEfficiencyData
+    bw_data::PMBandwidthData
+end
+
+function Base.getproperty(ncpm::NoncollinearPhaseMatch, sym::Symbol)
+    # Forward PMNoncollinearData and PMRefractionData field requests
+    if sym in fieldnames(PMNoncollinearData)
+        return getfield(ncpm.pm_data, sym)
+    elseif sym in fieldnames(PMRefractionData)
+        return getfield(ncpm.refr_data, sym)
+    else # Fallback to real fields
+        return getfield(ncpm, sym)
+    end
+end
+
+function NoncollinearPhaseMatch(
+    cr::NonlinearCrystal,
+    lambda_rrb::NTuple{3,Length},
+    temp::Temperature,
+    hi_or_lo_rrb::NTuple{3,Symbol},
+    theta_pm_rrb::NTuple{3,Angle},
+    phi_pm_rrb::NTuple{3,Angle};
+    angle_tol::Angle=0.1u"°",
+)
+    # Sort red lambdas: r1 by definition always has a higher (or equal) wavelength than r2 
+    if lambda_rrb[1] < lambda_rrb[2]
+        lambda_rrb = lambda_rrb[[2, 1, 3]]
+        hi_or_lo_rrb = hi_or_lo_rrb[[2, 1, 3]]
+        theta_pm_rrb = theta_pm_rrb[[2, 1, 3]]
+        phi_pm_rrb = phi_pm_rrb[[2, 1, 3]]
+    end
+
+    rd_rrb = Tuple((RefractionData(hi_or_lo_rrb[i], theta_pm_rrb[i], phi_pm_rrb[i], cr, lambda_rrb[i]; temp) for i in eachindex(lambda_rrb)))
+    refr_data = PMRefractionData(rd_rrb...)
+
+    pm_data = PMNoncollinearData(refr_data, hi_or_lo_rrb, theta_pm_rrb, phi_pm_rrb, cr, lambda_rrb, temp; angle_tol)
+
+    eff_data = PMEfficiencyData(pm_data, refr_data)
+    bw_data = PMBandwidthData(pm_data, refr_data)
+
+    return NoncollinearPhaseMatch{typeof(cr)}(refr_data, pm_data, eff_data, bw_data)
+end
+
+
+
+function Base.show(io::IO, ncpm::NoncollinearPhaseMatch)
+    digits = 3
+
+    # Helper
+    vec_str(v) = "[" * join(round.(v; digits), ", ") * "]"
+
+    # Header
+    @printf(io, "%-29s %s\n", "Crystal:", ncpm.cr.metadata[:description])
+    @printf(io, "%-29s θ: %3.2f°, ϕ: %3.2f°\n", "k angles r1:",
+        ustrip(u"°", ncpm.theta_pm_rrb[1]), ustrip(u"°", ncpm.phi_pm_rrb[1]))
+        @printf(io, "%-29s θ: %3.2f°, ϕ: %3.2f°\n", "k angles r2:",
+        ustrip(u"°", ncpm.theta_pm_rrb[2]), ustrip(u"°", ncpm.phi_pm_rrb[2]))
+        @printf(io, "%-29s θ: %3.2f°, ϕ: %3.2f°\n", "k angles b:",
+        ustrip(u"°", ncpm.theta_pm_rrb[3]), ustrip(u"°", ncpm.phi_pm_rrb[3]))
+        @printf(io, "%-29s %-25s\n", "k direction r1:", vec_str(angles_to_vector(ncpm.theta_pm_rrb[1], ncpm.phi_pm_rrb[1])))
+        @printf(io, "%-29s %-25s\n", "k direction r2:", vec_str(angles_to_vector(ncpm.theta_pm_rrb[2], ncpm.phi_pm_rrb[2])))
+        @printf(io, "%-29s %-25s\n", "k direction b:", vec_str(angles_to_vector(ncpm.theta_pm_rrb[3], ncpm.phi_pm_rrb[3])))
+    @printf(io, "%-29s %3.2f K (%3.2f °C)\n", "Temperature:",
+        ustrip(u"K", ncpm.temp), ustrip(u"°C", ncpm.temp))
+
+    println(io, "────────────────────────────────────────────────────────────────────────────────────────────────────────")
+
+    # Wavelengths
+    λs = ustrip.(u"nm", round.(u"nm", ncpm.lambda_rrb; digits))
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "Wavelength (nm):", λs...)
+
+    # Polarization types
+    if isa(ncpm.cr, UnidirectionalCrystal)
+        types = ncpm.pm_data.pm_type
+        polar_str = ["$(ncpm.hi_or_lo_rrb[i]) ($(types[1].o_or_e_rrb[i]))" for i in 1:3]
+        @printf(io, "%-29s %-25s %-25s %-25s\n", "Type $(types[1].type) PM:", polar_str...)
+    else
+        @printf(io, "%-29s %-25s %-25s %-25s\n", "Refractive index type:", ncpm.hi_or_lo_rrb...)
+        for t in ncpm.pm_data.pm_type
+            isnothing(t) && continue
+            pols = ["$(t.o_or_e_rrb[i])" for i in 1:3]
+            @printf(io, "%-29s %-25s %-25s %-25s\n", "Type $(t.type) PM in $(t.principal_plane) plane:", pols...)
+        end
+    end
+
+    # Index summary
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "Refractive index:",
+        auto_fmt.(ncpm.n_rrb; digits)...)
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "Group index:",
+        auto_fmt.(ncpm.group_index_rrb; digits)...)
+
+    # Walkoff
+    w = auto_fmt.(ustrip.(u"mrad", ncpm.walkoff_angle_rrb); digits)
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "Walkoff angle (mrad):", w...)
+
+    # Directions
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "S direction:", vec_str.(ncpm.S_dir_rrb)...)
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "E direction:", vec_str.(ncpm.E_dir_rrb)...)
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "D direction:", vec_str.(ncpm.D_dir_rrb)...)
+
+    # Dispersion
+    gvd = auto_fmt.(ustrip.(u"fs^2/mm", ncpm.beta2_rrb); digits)
+    tod = auto_fmt.(ustrip.(u"fs^3/mm", ncpm.beta3_rrb); digits)
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "β₂ (fs²/mm):", gvd...)
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "β₃ (fs³/mm):", tod...)
+
+    # Bandwidths
+    ωbw = auto_fmt.(ustrip.(u"GHz*cm", round.(u"GHz*cm", ncpm.bw_data.omega_L_bw; digits)))
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "ω BW × L (GHz·cm):", ωbw...)
+
+    @printf(io, "%-29s %-25s\n", "T BW × L (K·cm):",
+        auto_fmt(ustrip(u"K*cm", round(u"K*cm", ncpm.bw_data.temp_L_bw; digits))))
+
+    @printf(io, "%-29s %-25s\n", "θ BW × L (mrad·cm):",
+        auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", ncpm.bw_data.theta_L_bw; digits))))
+
+    @printf(io, "%-29s %-25s\n", "ϕ BW × L (mrad·cm):",
+        auto_fmt(ustrip(u"mrad*cm", round(u"mrad*cm", ncpm.bw_data.phi_L_bw; digits))))
+
+    # Efficiency
+    @printf(io, "%-29s %-25s\n",
+        "d_eff (pm/V):",
+        auto_fmt(ustrip(u"pm/V", round(u"pm/V", ncpm.eff_data.d_eff; digits))) *
+        " (w/o Miller scaling: " *
+        auto_fmt(ustrip(u"pm/V", round(u"pm/V", ncpm.eff_data.d_eff_no_miller; digits))) *
+        ")"
+    )
+
+    @printf(io, "%-29s %-25s\n",
+        "S₀ × L² (W):",
+        auto_fmt(ustrip(u"W", round(u"W", ncpm.eff_data.S0_Lsquared; sigdigits=digits))) *
+        " (w/o Miller scaling: " *
+        auto_fmt(ustrip(u"W", round(u"W", ncpm.eff_data.S0_Lsquared_no_miller; sigdigits=digits))) *
+        ")"
+    )
+
+    println(io, "────────────────────────────────────────────────────────────────────────────────────────────────────────")
+end
+
+
+
+
+function delta_k_noncollinear(
+    theta_pm_rrb::NTuple{3,Angle},
+    phi_pm_rrb::NTuple{3,Angle},
+    hi_or_lo_rrb::NTuple{3,Symbol},
+    cr::NonlinearCrystal;
+    lambda_r1::Union{Nothing,Length}=nothing,
+    lambda_r2::Union{Nothing,Length}=nothing,
+    lambda_b::Union{Nothing,Length}=nothing,
+    temp::Temperature=default_temp(cr),
+    calc_refraction_data::Bool=false, 
+)
+    lambda_rrb = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
+    @assert all([p in [:hi, :lo] for p in hi_or_lo_rrb])
+
+    if calc_refraction_data
+        rd_rrb = Tuple((RefractionData(hi_or_lo_rrb[i], theta_pm_rrb[i], phi_pm_rrb[i], cr, lambda_rrb[i]; temp) for i in eachindex(lambda_rrb)))
+        k_vec_rrb = Tuple((angles_to_vector(rd.theta, rd.phi) * rd.n / rd.lambda for rd in rd_rrb))
+    else
+        n_rrb = [calc_n_hi_lo(theta_pm_rrb[i], phi_pm_rrb[i], cr, lambda_rrb[i]; temp)[hi_or_lo_rrb[i] === :hi ? 1 : 2] for i in eachindex(lambda_rrb)]
+        k_vec_rrb = [angles_to_vector(theta_pm_rrb[i], phi_pm_rrb[i]) * n_rrb[i] / lambda_rrb[i] for i in eachindex(lambda_rrb)]
+    end
+
+    delta_k_vec = k_vec_rrb[1] + k_vec_rrb[2] - k_vec_rrb[3]
+
+    return calc_refraction_data ? (delta_k_vec, rd_rrb) : delta_k_vec
+end
+
+
+
+"""
+    delta_k_noncollinear_with_shifting(theta_pm_rrb, phi_pm_rrb, hi_or_lo_rrb, cr; ...)
+
+Same as [`delta_k_noncollinear`](@ref), but allows small parameter perturbations (Δθ, Δϕ, ΔT, Δω_r1, Δω_r2, Δω_b).
+The frequency shifts adjust the wavelengths while conserving energy (Δω_r1 + Δω_r2 = Δω_b), enabling bandwidth estimation.
+
+Used internally for computing how Δk varies with perturbations for calculating ΔX · L quantities in [`PMBandwidthData`](@ref).
+"""
+function delta_k_noncollinear_with_shifting(
+    theta_pm_rrb::NTuple{3,Angle},
+    phi_pm_rrb::NTuple{3,Angle},
+    hi_or_lo_rrb::NTuple{3,Symbol},
+    cr::NonlinearCrystal;
+    lambda_r1::Union{Nothing,Length}=nothing,
+    lambda_r2::Union{Nothing,Length}=nothing,
+    lambda_b::Union{Nothing,Length}=nothing,
+    temp::Temperature=default_temp(cr),
+    delta_theta=0.0u"°",
+    delta_phi=0.0u"°",
+    delta_temp::Temperature=0.0u"K",
+    delta_omega_r1::Frequency=0.0u"GHz",
+    delta_omega_r2::Frequency=0.0u"GHz",
+    delta_omega_b::Frequency=0.0u"GHz",
+)
+    lambda_r1, lambda_r2, lambda_b = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
+    @assert all([p in [:hi, :lo] for p in hi_or_lo_rrb])
+
+    @assert delta_omega_r1 + delta_omega_r2 == delta_omega_b "Phasematching is only fulfilled for Δω_r1 + Δω_r2 = Δω_b"
+    lambda_r1_shifted = shift_lambda_with_freq(lambda_r1, delta_omega_r1)
+    lambda_r2_shifted = shift_lambda_with_freq(lambda_r2, delta_omega_r2)
+    lambda_b_shifted = shift_lambda_with_freq(lambda_b, delta_omega_b)
+
+    delta_k_noncollinear(
+        (theta_pm_rrb .+ delta_theta) .|> u"rad",
+        (phi_pm_rrb .+ delta_phi) .|> u"rad",
+        hi_or_lo_rrb,
+        cr;
+        lambda_r1=lambda_r1_shifted,
+        lambda_r2=lambda_r2_shifted,
+        lambda_b=lambda_b_shifted,
+        temp=temp + delta_temp,
+    )
+end
+
+
+function temperature_L_bandwidth(pm_data::PMNoncollinearData)
+    fun = ΔT -> ustrip.(
+        u"m^-1",
+        delta_k_noncollinear_with_shifting(
+            pm_data.theta_pm_rrb,
+            pm_data.phi_pm_rrb,
+            pm_data.hi_or_lo_rrb,
+            pm_data.cr;
+            lambda_r1=pm_data.lambda_rrb[1],
+            lambda_r2=pm_data.lambda_rrb[2],
+            lambda_b=pm_data.lambda_rrb[3],
+            pm_data.temp,
+            delta_temp=ΔT * u"K",
+        )
+    )
+    ddeltak_dT = ForwardDiff.derivative(
+        fun,
+        0.0
+    ) * 1u"m^-1 * K^-1"
+
+    # ΔT_bw * L = 2π / |∂Δk/∂T|
+    return 2π / norm(ddeltak_dT) # TODO: Using the norm here is a conservative assumption. A projection in a certain direction could be more suitable here. 
+end
+
+function theta_L_bandwidth(pm_data::PMNoncollinearData)
+    fun = Δθ -> ustrip.(
+        u"m^-1",
+        delta_k_noncollinear_with_shifting(
+            pm_data.theta_pm_rrb,
+            pm_data.phi_pm_rrb,
+            pm_data.hi_or_lo_rrb,
+            pm_data.cr;
+            lambda_r1=pm_data.lambda_rrb[1],
+            lambda_r2=pm_data.lambda_rrb[2],
+            lambda_b=pm_data.lambda_rrb[3],
+            pm_data.temp,
+            delta_theta=Δθ * u"rad",
+        )
+    )
+    ddeltak_dtheta = ForwardDiff.derivative(
+        fun,
+        0.0
+    ) * 1u"m^-1 * rad^-1"
+
+    # Δθ_bw * L = 2π / |∂Δk/∂θ|
+    return 2π / norm(ddeltak_dtheta) # TODO: Using the norm here is a conservative assumption. A projection in a certain direction could be more suitable here. 
+end
+
+function phi_L_bandwidth(pm_data::PMNoncollinearData)
+    fun = Δϕ -> ustrip.(
+        u"m^-1",
+        delta_k_noncollinear_with_shifting(
+            pm_data.theta_pm_rrb,
+            pm_data.phi_pm_rrb,
+            pm_data.hi_or_lo_rrb,
+            pm_data.cr;
+            lambda_r1=pm_data.lambda_rrb[1],
+            lambda_r2=pm_data.lambda_rrb[2],
+            lambda_b=pm_data.lambda_rrb[3],
+            pm_data.temp,
+            delta_phi=Δϕ * u"rad",
+        )
+    )
+    ddeltak_dphi = ForwardDiff.derivative(
+        fun,
+        0.0
+    ) * 1u"m^-1 * rad^-1"
+
+    # Δϕ_bw * L = 2π / |∂Δk/∂ϕ|
+    return 2π / norm(ddeltak_dphi) # TODO: Using the norm here is a conservative assumption. A projection in a certain direction could be more suitable here. 
+end

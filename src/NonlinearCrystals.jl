@@ -30,6 +30,7 @@ include("crystals.jl")
 include("d_tensor.jl")
 include("crystal_symmetry.jl")
 include("phasematch.jl")
+include("noncollinear.jl")
 include("plot_phasematch.jl")
 
 # Include all crystals

@@ -83,4 +83,4 @@ function create_bibo()
 end
 
 export BIBO
-BIBO = create_bibo()
+const BIBO = create_bibo()

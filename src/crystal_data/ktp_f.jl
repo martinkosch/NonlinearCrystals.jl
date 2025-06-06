@@ -67,4 +67,4 @@ function create_ktp_f()
 end
 
 export KTP_F
-KTP_F = create_ktp_f()
+const KTP_F = create_ktp_f()

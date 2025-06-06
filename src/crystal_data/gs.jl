@@ -64,4 +64,4 @@ function create_gs()
 end
 
 export GS
-GS = create_gs()
+const GS = create_gs()

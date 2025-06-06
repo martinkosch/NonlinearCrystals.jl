@@ -56,4 +56,4 @@
 # end
 
 # export LNB_M
-# LNB_M = create_lnb_m()
+# const LNB_M = create_lnb_m()

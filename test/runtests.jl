@@ -31,6 +31,10 @@ end
     include("crystal_data_tests/cga.jl")
 end
 
+@safetestset "Crystal test: GS" begin
+    include("crystal_data_tests/gs.jl")
+end
+
 @safetestset "Crystal test: KTP_F" begin
     include("crystal_data_tests/ktp_f.jl")
 end

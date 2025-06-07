@@ -97,6 +97,9 @@ function Base.getproperty(cr::UnidirectionalCrystal, sym::Symbol)
         return getfield(cr, sym)
     end
 end
+using Printf
+using Unitful
+using Unitful: ustrip
 
 function Base.show(io::IO, crystal::UnidirectionalCrystal)
     meta = crystal.metadata
@@ -110,24 +113,25 @@ function Base.show(io::IO, crystal::UnidirectionalCrystal)
     print(io,  "  d tensor (pm/V)  : ⎡")
     for j in 1:6
         val = d[1, j]
-        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
+        print(io, iszero(val) ? "   ·   " : @sprintf("%7.2f", val))
     end
     println(io, "⎤")
 
     print(io,  "                     ⎢")
     for j in 1:6
         val = d[2, j]
-        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
+        print(io, iszero(val) ? "   ·   " : @sprintf("%7.2f", val))
     end
     println(io, "⎥")
 
     print(io,  "                     ⎣")
     for j in 1:6
         val = d[3, j]
-        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
+        print(io, iszero(val) ? "   ·   " : @sprintf("%7.2f", val))
     end
     println(io, "⎦")
 end
+
 
 ## Bidirectional crystal
 """
@@ -195,21 +199,21 @@ function Base.show(io::IO, crystal::BidirectionalCrystal)
     print(io,  "  d tensor (pm/V)  : ⎡")
     for j in 1:6
         val = d[1, j]
-        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
+        print(io, iszero(val) ? "   ·   " : @sprintf("%7.2f", val))
     end
     println(io, "⎤")
 
     print(io,  "                     ⎢")
     for j in 1:6
         val = d[2, j]
-        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
+        print(io, iszero(val) ? "   ·   " : @sprintf("%7.2f", val))
     end
     println(io, "⎥")
 
     print(io,  "                     ⎣")
     for j in 1:6
         val = d[3, j]
-        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
+        print(io, iszero(val) ? "   ·   " : @sprintf("%7.2f", val))
     end
     println(io, "⎦")
 end

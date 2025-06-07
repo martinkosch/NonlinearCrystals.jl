@@ -98,6 +98,25 @@ function Base.getproperty(cr::UnidirectionalCrystal, sym::Symbol)
     end
 end
 
+function Base.show(io::IO, crystal::UnidirectionalCrystal)
+    meta = crystal.metadata
+    @printf(io, "UnidirectionalCrystal: %s\n", get(meta, :description, ""))
+    @printf(io, "  Formula          : %s\n", get(meta, :formula, ""))
+    @printf(io, "  Point group      : %s\n", get(meta, :point_group, ""))
+    @printf(io, "  n_o              : %s\n", round(crystal.n_XY_principal(); digits=3))
+    @printf(io, "  n_e_principal    : %s\n", round(crystal.n_Z_principal(); digits=3))
+
+    d = ustrip.(u"pm/V", crystal.d_XYZ_ref)
+    @printf(io, "  d tensor (pm/V)  :\n")
+    for i in 1:3
+        @printf(io, "    ")
+        for j in 1:6
+            @printf(io, "%6.2f ", d[i,j])
+        end
+        println(io)
+    end
+end
+
 ## Bidirectional crystal
 """
     BidirectionalCrystal(metadata::Dict,
@@ -150,6 +169,27 @@ function Base.getproperty(cr::BidirectionalCrystal, sym::Symbol)
         return getfield(cr, sym)
     end
 end
+
+function Base.show(io::IO, crystal::BidirectionalCrystal)
+    meta = crystal.metadata
+    @printf(io, "BidirectionalCrystal: %s\n", get(meta, :description, ""))
+    @printf(io, "  Formula          : %s\n", get(meta, :formula, ""))
+    @printf(io, "  Point group      : %s\n", get(meta, :point_group, ""))
+    @printf(io, "  n_X_principal    : %s\n", round(crystal.n_X_principal(); digits=3))
+    @printf(io, "  n_Y_principal    : %s\n", round(crystal.n_Y_principal(); digits=3))
+    @printf(io, "  n_Z_principal    : %s\n", round(crystal.n_Z_principal(); digits=3))
+
+    d = ustrip.(u"pm/V", crystal.d_XYZ_ref)
+    @printf(io, "  d tensor (pm/V)  :\n")
+    for i in 1:3
+        @printf(io, "    ")
+        for j in 1:6
+            @printf(io, "%6.2f ", d[i,j])
+        end
+        println(io)
+    end
+end
+
 
 """
     assign_o_or_e(principal_plane::Symbol, E_dir::AbstractVector{<:Number}; angle_tol_ud::Angle=0.2u"°")

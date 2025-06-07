@@ -103,18 +103,30 @@ function Base.show(io::IO, crystal::UnidirectionalCrystal)
     @printf(io, "UnidirectionalCrystal: %s\n", get(meta, :description, ""))
     @printf(io, "  Formula          : %s\n", get(meta, :formula, ""))
     @printf(io, "  Point group      : %s\n", get(meta, :point_group, ""))
-    @printf(io, "  n_o              : %s\n", round(crystal.n_XY_principal(); digits=3))
-    @printf(io, "  n_e_principal    : %s\n", round(crystal.n_Z_principal(); digits=3))
+    @printf(io, "  n_o              : %.3f\n", round(crystal.n_XY_principal(); digits=3))
+    @printf(io, "  n_e_principal    : %.3f\n", round(crystal.n_Z_principal(); digits=3))
 
     d = ustrip.(u"pm/V", crystal.d_XYZ_ref)
-    @printf(io, "  d tensor (pm/V)  :\n")
-    for i in 1:3
-        @printf(io, "    ")
-        for j in 1:6
-            @printf(io, "%6.2f ", d[i,j])
-        end
-        println(io)
+    print(io,  "  d tensor (pm/V)  : ⎡")
+    for j in 1:6
+        val = d[1, j]
+        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
     end
+    println(io, "⎤")
+
+    print(io,  "                     ⎢")
+    for j in 1:6
+        val = d[2, j]
+        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
+    end
+    println(io, "⎥")
+
+    print(io,  "                     ⎣")
+    for j in 1:6
+        val = d[3, j]
+        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
+    end
+    println(io, "⎦")
 end
 
 ## Bidirectional crystal
@@ -175,21 +187,32 @@ function Base.show(io::IO, crystal::BidirectionalCrystal)
     @printf(io, "BidirectionalCrystal: %s\n", get(meta, :description, ""))
     @printf(io, "  Formula          : %s\n", get(meta, :formula, ""))
     @printf(io, "  Point group      : %s\n", get(meta, :point_group, ""))
-    @printf(io, "  n_X_principal    : %s\n", round(crystal.n_X_principal(); digits=3))
-    @printf(io, "  n_Y_principal    : %s\n", round(crystal.n_Y_principal(); digits=3))
-    @printf(io, "  n_Z_principal    : %s\n", round(crystal.n_Z_principal(); digits=3))
+    @printf(io, "  n_X_principal    : %.3f\n", round(crystal.n_X_principal(); digits=3))
+    @printf(io, "  n_Y_principal    : %.3f\n", round(crystal.n_Y_principal(); digits=3))
+    @printf(io, "  n_Z_principal    : %.3f\n", round(crystal.n_Z_principal(); digits=3))
 
     d = ustrip.(u"pm/V", crystal.d_XYZ_ref)
-    @printf(io, "  d tensor (pm/V)  :\n")
-    for i in 1:3
-        @printf(io, "    ")
-        for j in 1:6
-            @printf(io, "%6.2f ", d[i,j])
-        end
-        println(io)
+    print(io,  "  d tensor (pm/V)  : ⎡")
+    for j in 1:6
+        val = d[1, j]
+        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
     end
-end
+    println(io, "⎤")
 
+    print(io,  "                     ⎢")
+    for j in 1:6
+        val = d[2, j]
+        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
+    end
+    println(io, "⎥")
+
+    print(io,  "                     ⎣")
+    for j in 1:6
+        val = d[3, j]
+        print(io, iszero(val) ? "  ·   " : @sprintf("%6.2f", val))
+    end
+    println(io, "⎦")
+end
 
 """
     assign_o_or_e(principal_plane::Symbol, E_dir::AbstractVector{<:Number}; angle_tol_ud::Angle=0.2u"°")

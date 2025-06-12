@@ -18,7 +18,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 [compat]
 Aqua = "0.8"
 ForwardDiff = "0.10.38, 1"
-GLMakie = "0.11.3"
+GLMakie = "0.11.3, 0.12"
 GeometryBasics = "0.5.5"
 LinearAlgebra = "1.6.0"
 PhysicalConstants = "0.2.4"

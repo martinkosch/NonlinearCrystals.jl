@@ -72,4 +72,4 @@ function create_lbo()
 end
 
 export LBO
-LBO = create_lbo()
+const LBO = create_lbo()

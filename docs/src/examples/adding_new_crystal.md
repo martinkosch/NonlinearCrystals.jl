@@ -27,7 +27,7 @@ end
 
 # Export and instantiate the crystal
 export BBO
-BBO = create_bbo()
+const BBO = create_bbo()
 ```
 
 Inside the function, follow the steps above.

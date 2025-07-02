@@ -37,4 +37,4 @@ function create_cga()
 end
 
 export CGA
-CGA = create_cga()
+const CGA = create_cga()

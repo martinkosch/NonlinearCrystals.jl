@@ -59,4 +59,4 @@ function create_lnb_c()
 end
 
 export LNB_C
-LNB_C = create_lnb_c()
+const LNB_C = create_lnb_c()

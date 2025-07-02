@@ -97,6 +97,41 @@ function Base.getproperty(cr::UnidirectionalCrystal, sym::Symbol)
         return getfield(cr, sym)
     end
 end
+using Printf
+using Unitful
+using Unitful: ustrip
+
+function Base.show(io::IO, crystal::UnidirectionalCrystal)
+    meta = crystal.metadata
+    @printf(io, "UnidirectionalCrystal: %s\n", get(meta, :description, ""))
+    @printf(io, "  Formula          : %s\n", get(meta, :formula, ""))
+    @printf(io, "  Point group      : %s\n", get(meta, :point_group, ""))
+    @printf(io, "  n_o              : %.3f\n", round(crystal.n_XY_principal(); digits=3))
+    @printf(io, "  n_e_principal    : %.3f\n", round(crystal.n_Z_principal(); digits=3))
+
+    d = ustrip.(u"pm/V", crystal.d_XYZ_ref)
+    print(io,  "  d tensor (pm/V)  : ⎡")
+    for j in 1:6
+        val = d[1, j]
+        print(io, iszero(val) ? "    ·  " : @sprintf("%7.2f", val))
+    end
+    println(io, "⎤")
+
+    print(io,  "                     ⎢")
+    for j in 1:6
+        val = d[2, j]
+        print(io, iszero(val) ? "    ·  " : @sprintf("%7.2f", val))
+    end
+    println(io, "⎥")
+
+    print(io,  "                     ⎣")
+    for j in 1:6
+        val = d[3, j]
+        print(io, iszero(val) ? "    ·  " : @sprintf("%7.2f", val))
+    end
+    println(io, "⎦")
+end
+
 
 ## Bidirectional crystal
 """
@@ -149,6 +184,38 @@ function Base.getproperty(cr::BidirectionalCrystal, sym::Symbol)
     else # Fallback to real fields
         return getfield(cr, sym)
     end
+end
+
+function Base.show(io::IO, crystal::BidirectionalCrystal)
+    meta = crystal.metadata
+    @printf(io, "BidirectionalCrystal: %s\n", get(meta, :description, ""))
+    @printf(io, "  Formula          : %s\n", get(meta, :formula, ""))
+    @printf(io, "  Point group      : %s\n", get(meta, :point_group, ""))
+    @printf(io, "  n_X_principal    : %.3f\n", round(crystal.n_X_principal(); digits=3))
+    @printf(io, "  n_Y_principal    : %.3f\n", round(crystal.n_Y_principal(); digits=3))
+    @printf(io, "  n_Z_principal    : %.3f\n", round(crystal.n_Z_principal(); digits=3))
+
+    d = ustrip.(u"pm/V", crystal.d_XYZ_ref)
+    print(io,  "  d tensor (pm/V)  : ⎡")
+    for j in 1:6
+        val = d[1, j]
+        print(io, iszero(val) ? "    ·  " : @sprintf("%7.2f", val))
+    end
+    println(io, "⎤")
+
+    print(io,  "                     ⎢")
+    for j in 1:6
+        val = d[2, j]
+        print(io, iszero(val) ? "    ·  " : @sprintf("%7.2f", val))
+    end
+    println(io, "⎥")
+
+    print(io,  "                     ⎣")
+    for j in 1:6
+        val = d[3, j]
+        print(io, iszero(val) ? "    ·  " : @sprintf("%7.2f", val))
+    end
+    println(io, "⎦")
 end
 
 """

@@ -22,7 +22,6 @@ using Unitful
 # Test sampled phase-matches 
 # Reference: https://martinkosch.github.io/NonlinearCrystals.jl/dev/bibliography/#dmitriev2013handbook
 pm1 = find_nearest_pm_along_theta_phi(18u"°", 30u"°", (:o, :o, :e), GS; lambda_r1=2.36u"µm", lambda_r2=2.36u"µm", temp=293u"K") 
-@show pm1
 @test all(pm1.pm_type[1].o_or_e_rrb .== (:o, :o, :e))
 @test pm1.pm_type[1].principal_plane == :UD
 @test isnothing(pm1.pm_type[2])

@@ -67,4 +67,4 @@ function create_ktp_h()
 end
 
 export KTP_H
-KTP_H = create_ktp_h()
+const KTP_H = create_ktp_h()

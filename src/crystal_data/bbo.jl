@@ -51,4 +51,4 @@ function create_bbo()
 end
 
 export BBO
-BBO = create_bbo()
+const BBO = create_bbo()

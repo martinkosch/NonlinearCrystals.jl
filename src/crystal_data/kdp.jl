@@ -63,4 +63,4 @@ function create_kdp()
 end
 
 export KDP
-KDP = create_kdp()
+const KDP = create_kdp()

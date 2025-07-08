@@ -2,18 +2,20 @@ module NonlinearCrystals
 
 import Printf: @printf, @sprintf
 using StaticArrays
-using LinearAlgebra 
-using Tullio 
-using Unitful 
-using Roots 
-using GLMakie 
+using LinearAlgebra
+using Tullio
+using Unitful
+using Roots
+using GLMakie
 using GeometryBasics
+using YAML
+
 
 import ForwardDiff
 import PhysicalConstants.CODATA2022: c_0, ε_0
 
 import Unitful: Temperature, Length, Frequency
-@derived_dimension Angle  Unitful.𝐋^0  true # Used to force explicit angle units
+@derived_dimension Angle Unitful.𝐋^0 true # Used to force explicit angle units
 
 # Color defaults
 const COL_COORDS = to_colormap(:Greys)[7]

@@ -367,6 +367,101 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
 
     println(io, "────────────────────────────────────────────────────────────────────────────────────────────────────────")
 end
+function to_yaml(io::IO, cpm::CollinearPhaseMatch)
+    # Temperature and wavelength
+    temperature = ustrip(u"K", cpm.temp)
+    wavelength = ustrip.(u"m", cpm.lambda_rrb)                      # m
+
+    # Angles
+    theta = ustrip(u"rad", cpm.theta_pm)
+    phi = ustrip(u"rad", cpm.phi_pm)
+
+    # k direction
+    k_direction = collect(angles_to_vector(cpm.theta_pm, cpm.phi_pm))
+
+    # S, E, D directions
+    S_direction = [collect(cpm.S_dir_rrb[i]) for i in 1:3]
+    E_direction = [collect(cpm.E_dir_rrb[i]) for i in 1:3]
+    D_direction = [collect(cpm.D_dir_rrb[i]) for i in 1:3]
+
+    # Indices
+    refractive_index = cpm.n_rrb
+    group_index = cpm.group_index_rrb
+
+    # Walkoff
+    walkoff_angle = ustrip.(u"rad", cpm.walkoff_angle_rrb)
+
+    # Dispersion
+    beta2 = ustrip.(u"s^2/m", cpm.beta2_rrb)
+    beta3 = ustrip.(u"s^3/m", cpm.beta3_rrb)
+
+    # Bandwidths
+    bandwidths = Dict(
+        "omega_L" => ustrip.(u"Hz*m", cpm.bw_data.omega_L_bw),
+        "temp_L" => ustrip(u"K*m", cpm.bw_data.temp_L_bw),
+        "theta_L" => ustrip(u"rad*m", cpm.bw_data.theta_L_bw),
+        "phi_L" => ustrip(u"rad*m", cpm.bw_data.phi_L_bw)
+    )
+
+    # Efficiency
+    efficiency = Dict(
+        "d_eff" => ustrip(u"m/V", cpm.eff_data.d_eff),
+        "d_eff_no_miller" => ustrip(u"m/V", cpm.eff_data.d_eff_no_miller),
+        "S0_L2" => ustrip(u"W", cpm.eff_data.S0_Lsquared),
+        "S0_L2_no_miller" => ustrip(u"W", cpm.eff_data.S0_Lsquared_no_miller)
+    )
+
+    # Geometry block
+    geometry = Dict(
+        "angles" => Dict("theta" => theta, "phi" => phi),  # rad
+        "k_direction" => k_direction,
+        "S_direction" => S_direction,
+        "E_direction" => E_direction,
+        "D_direction" => D_direction
+    )
+
+    # Top-level YAML structure
+    data = Dict(
+        "crystal" => cpm.cr.metadata[:description],
+        "temperature" => temperature,
+        "wavelength" => wavelength,
+        "refractive_index" => refractive_index,
+        "group_index" => group_index,
+        "walkoff_angle" => walkoff_angle,
+        "geometry" => geometry,
+        "beta2" => beta2,
+        "beta3" => beta3,
+        "bandwidths" => bandwidths,
+        "efficiency" => efficiency
+    )
+
+    # Polarization
+    if isa(cpm.cr, UnidirectionalCrystal)
+        types = cpm.pm_data.pm_type
+        data["polarization"] = Dict(
+            "type" => string(types[1].type),
+            "components" => [
+                Dict("hi_lo" => cpm.hi_or_lo_rrb[i], "pol" => types[1].o_or_e_rrb[i])
+                for i in 1:3
+            ]
+        )
+    else
+        data["refractive_index_type"] = cpm.hi_or_lo_rrb
+        pols = []
+        for t in cpm.pm_data.pm_type
+            isnothing(t) && continue
+            push!(pols, Dict(
+                "type" => string(t.type),
+                "principal_plane" => string(t.principal_plane),
+                "pols" => t.o_or_e_rrb
+            ))
+        end
+        data["polarization"] = pols
+    end
+
+    YAML.write(io, data)
+end
+
 
 """
     pm_wavelengths(; lambda_r1=nothing, lambda_r2=nothing, lambda_b=nothing)

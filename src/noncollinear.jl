@@ -1,4 +1,4 @@
-export delta_k_noncollinear, NoncollinearPhaseMatch
+export delta_k_noncollinear, NoncollinearPhaseMatch, to_yaml
 
 struct PMNoncollinearData{CT<:NonlinearCrystal}
     hi_or_lo_rrb::NTuple{3,Symbol}
@@ -28,10 +28,10 @@ function PMNoncollinearData(
         @show principal_planes_rrb
 
         # Only return principal plane if it is identical for all wavelengths
-        common(x) = all(x .== x[begin]) ? x[begin] : nothing 
+        common(x) = all(x .== x[begin]) ? x[begin] : nothing
         principal_planes = (common([p[i] for p in principal_planes_rrb]) for i in eachindex(principal_planes_rrb[1]))
 
-        pm_type = Tuple((isnothing(p) ? nothing : PMType(p, refr_data) for p in principal_planes)) 
+        pm_type = Tuple((isnothing(p) ? nothing : PMType(p, refr_data) for p in principal_planes))
     end
 
     return PMNoncollinearData{typeof(cr)}(
@@ -118,7 +118,6 @@ function NoncollinearPhaseMatch(
 end
 
 
-
 function Base.show(io::IO, ncpm::NoncollinearPhaseMatch)
     digits = 3
 
@@ -127,15 +126,6 @@ function Base.show(io::IO, ncpm::NoncollinearPhaseMatch)
 
     # Header
     @printf(io, "%-29s %s\n", "Crystal:", ncpm.cr.metadata[:description])
-    @printf(io, "%-29s θ: %3.2f°, ϕ: %3.2f°\n", "k angles r1:",
-        ustrip(u"°", ncpm.theta_pm_rrb[1]), ustrip(u"°", ncpm.phi_pm_rrb[1]))
-        @printf(io, "%-29s θ: %3.2f°, ϕ: %3.2f°\n", "k angles r2:",
-        ustrip(u"°", ncpm.theta_pm_rrb[2]), ustrip(u"°", ncpm.phi_pm_rrb[2]))
-        @printf(io, "%-29s θ: %3.2f°, ϕ: %3.2f°\n", "k angles b:",
-        ustrip(u"°", ncpm.theta_pm_rrb[3]), ustrip(u"°", ncpm.phi_pm_rrb[3]))
-        @printf(io, "%-29s %-25s\n", "k direction r1:", vec_str(angles_to_vector(ncpm.theta_pm_rrb[1], ncpm.phi_pm_rrb[1])))
-        @printf(io, "%-29s %-25s\n", "k direction r2:", vec_str(angles_to_vector(ncpm.theta_pm_rrb[2], ncpm.phi_pm_rrb[2])))
-        @printf(io, "%-29s %-25s\n", "k direction b:", vec_str(angles_to_vector(ncpm.theta_pm_rrb[3], ncpm.phi_pm_rrb[3])))
     @printf(io, "%-29s %3.2f K (%3.2f °C)\n", "Temperature:",
         ustrip(u"K", ncpm.temp), ustrip(u"°C", ncpm.temp))
 
@@ -170,6 +160,20 @@ function Base.show(io::IO, ncpm::NoncollinearPhaseMatch)
     @printf(io, "%-29s %-25s %-25s %-25s\n", "Walkoff angle (mrad):", w...)
 
     # Directions
+
+    # k angles in degrees
+    k_angles_str = [
+        "θ: $(round(ustrip(u"°", ncpm.theta_pm_rrb[i]); digits=2))°, ϕ: $(round(ustrip(u"°", ncpm.phi_pm_rrb[i]); digits=2))°"
+        for i in 1:3
+    ]
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "k angles (deg):", k_angles_str...)
+
+    # k directions
+    k_dirs = [
+        vec_str(angles_to_vector(ncpm.theta_pm_rrb[i], ncpm.phi_pm_rrb[i]))
+        for i in 1:3
+    ]
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "k direction:", k_dirs...)
     @printf(io, "%-29s %-25s %-25s %-25s\n", "S direction:", vec_str.(ncpm.S_dir_rrb)...)
     @printf(io, "%-29s %-25s %-25s %-25s\n", "E direction:", vec_str.(ncpm.E_dir_rrb)...)
     @printf(io, "%-29s %-25s %-25s %-25s\n", "D direction:", vec_str.(ncpm.D_dir_rrb)...)
@@ -214,6 +218,94 @@ function Base.show(io::IO, ncpm::NoncollinearPhaseMatch)
 end
 
 
+function to_yaml(io::IO, ncpm::NoncollinearPhaseMatch)
+    # Scalars and vectors
+    temperature = ustrip(u"K", ncpm.temp)
+    wavelength = ustrip.(u"m", ncpm.lambda_rrb)
+    refractive_index = ncpm.n_rrb
+    group_index = ncpm.group_index_rrb
+    walkoff_angle = ustrip.(u"rad", ncpm.walkoff_angle_rrb)
+    beta2 = ustrip.(u"s^2/m", ncpm.beta2_rrb)
+    beta3 = ustrip.(u"s^3/m", ncpm.beta3_rrb)
+
+    # Geometry
+    k_angles = [
+        Dict("theta" => ustrip(u"rad", ncpm.theta_pm_rrb[i]),
+            "phi" => ustrip(u"rad", ncpm.phi_pm_rrb[i]))
+        for i in 1:3
+    ]
+
+    k_directions = [
+        collect(angles_to_vector(ncpm.theta_pm_rrb[i], ncpm.phi_pm_rrb[i]))
+        for i in 1:3
+    ]
+
+    geometry = Dict(
+        "k_angles" => k_angles,               # List of {θ, φ} in radians
+        "k_directions" => k_directions,       # List of 3-vectors
+        "S_direction" => [collect(ncpm.S_dir_rrb[i]) for i in 1:3],
+        "E_direction" => [collect(ncpm.E_dir_rrb[i]) for i in 1:3],
+        "D_direction" => [collect(ncpm.D_dir_rrb[i]) for i in 1:3]
+    )
+
+    # Bandwidths
+    bandwidths = Dict(
+        "omega_L" => ustrip.(u"Hz*m", ncpm.bw_data.omega_L_bw),
+        "temp_L" => ustrip(u"K*m", ncpm.bw_data.temp_L_bw),
+        "theta_L" => ustrip(u"rad*m", ncpm.bw_data.theta_L_bw),
+        "phi_L" => ustrip(u"rad*m", ncpm.bw_data.phi_L_bw)
+    )
+
+    # Efficiency
+    efficiency = Dict(
+        "d_eff" => ustrip(u"m/V", ncpm.eff_data.d_eff),
+        "d_eff_no_miller" => ustrip(u"m/V", ncpm.eff_data.d_eff_no_miller),
+        "S0_L2" => ustrip(u"W", ncpm.eff_data.S0_Lsquared),
+        "S0_L2_no_miller" => ustrip(u"W", ncpm.eff_data.S0_Lsquared_no_miller)
+    )
+
+    # Top-level dict
+    data = Dict(
+        "crystal" => ncpm.cr.metadata[:description],
+        "temperature" => temperature,
+        "wavelength" => wavelength,
+        "refractive_index" => refractive_index,
+        "group_index" => group_index,
+        "walkoff_angle" => walkoff_angle,
+        "geometry" => geometry,
+        "beta2" => beta2,
+        "beta3" => beta3,
+        "bandwidths" => bandwidths,
+        "efficiency" => efficiency
+    )
+
+    # Polarization
+    if isa(ncpm.cr, UnidirectionalCrystal)
+        types = ncpm.pm_data.pm_type
+        data["polarization"] = Dict(
+            "type" => string(types[1].type),
+            "components" => [
+                Dict("hi_lo" => ncpm.hi_or_lo_rrb[i], "pol" => types[1].o_or_e_rrb[i])
+                for i in 1:3
+            ]
+        )
+    else
+        data["refractive_index_type"] = ncpm.hi_or_lo_rrb
+        pols = []
+        for t in ncpm.pm_data.pm_type
+            isnothing(t) && continue
+            push!(pols, Dict(
+                "type" => string(t.type),
+                "principal_plane" => string(t.principal_plane),
+                "pols" => t.o_or_e_rrb
+            ))
+        end
+        data["polarization"] = pols
+    end
+
+    YAML.write(io, data)
+end
+
 
 
 function delta_k_noncollinear(
@@ -225,7 +317,7 @@ function delta_k_noncollinear(
     lambda_r2::Union{Nothing,Length}=nothing,
     lambda_b::Union{Nothing,Length}=nothing,
     temp::Temperature=default_temp(cr),
-    calc_refraction_data::Bool=false, 
+    calc_refraction_data::Bool=false,
 )
     lambda_rrb = pm_wavelengths(; lambda_r1, lambda_r2, lambda_b)
     @assert all([p in [:hi, :lo] for p in hi_or_lo_rrb])

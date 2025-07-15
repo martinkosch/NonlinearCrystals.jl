@@ -166,7 +166,7 @@ function Base.show(io::IO, ncpm::NoncollinearPhaseMatch)
         "θ: $(round(ustrip(u"°", ncpm.theta_pm_rrb[i]); digits=2))°, ϕ: $(round(ustrip(u"°", ncpm.phi_pm_rrb[i]); digits=2))°"
         for i in 1:3
     ]
-    @printf(io, "%-29s %-25s %-25s %-25s\n", "k angles (deg):", k_angles_str...)
+    @printf(io, "%-29s %-25s %-25s %-25s\n", "k angle (deg):", k_angles_str...)
 
     # k directions
     k_dirs = [
@@ -217,22 +217,22 @@ function Base.show(io::IO, ncpm::NoncollinearPhaseMatch)
     println(io, "────────────────────────────────────────────────────────────────────────────────────────────────────────")
 end
 
-
 function to_yaml(io::IO, ncpm::NoncollinearPhaseMatch)
-    # Scalars and vectors
+    # Scalars and vectors (converted to lists to avoid tuple serialization)
     temperature = ustrip(u"K", ncpm.temp)
-    wavelength = ustrip.(u"m", ncpm.lambda_rrb)
-    refractive_index = ncpm.n_rrb
-    group_index = ncpm.group_index_rrb
-    walkoff_angle = ustrip.(u"rad", ncpm.walkoff_angle_rrb)
-    beta2 = ustrip.(u"s^2/m", ncpm.beta2_rrb)
-    beta3 = ustrip.(u"s^3/m", ncpm.beta3_rrb)
+    wavelength = collect(ustrip.(u"m", ncpm.lambda_rrb))
+    refractive_index = collect(ncpm.n_rrb)
+    group_index = collect(ncpm.group_index_rrb)
+    walkoff_angle = collect(ustrip.(u"rad", ncpm.walkoff_angle_rrb))
+    beta2 = collect(ustrip.(u"s^2/m", ncpm.beta2_rrb))
+    beta3 = collect(ustrip.(u"s^3/m", ncpm.beta3_rrb))
 
     # Geometry
     k_angles = [
-        Dict("theta" => ustrip(u"rad", ncpm.theta_pm_rrb[i]),
-            "phi" => ustrip(u"rad", ncpm.phi_pm_rrb[i]))
-        for i in 1:3
+        Dict(
+            "theta" => ustrip(u"rad", ncpm.theta_pm_rrb[i]),
+            "phi" => ustrip(u"rad", ncpm.phi_pm_rrb[i])
+        ) for i in 1:3
     ]
 
     k_directions = [
@@ -241,8 +241,8 @@ function to_yaml(io::IO, ncpm::NoncollinearPhaseMatch)
     ]
 
     geometry = Dict(
-        "k_angles" => k_angles,               # List of {θ, φ} in radians
-        "k_directions" => k_directions,       # List of 3-vectors
+        "k_angle" => k_angles,
+        "k_direction" => k_directions,
         "S_direction" => [collect(ncpm.S_dir_rrb[i]) for i in 1:3],
         "E_direction" => [collect(ncpm.E_dir_rrb[i]) for i in 1:3],
         "D_direction" => [collect(ncpm.D_dir_rrb[i]) for i in 1:3]
@@ -250,7 +250,7 @@ function to_yaml(io::IO, ncpm::NoncollinearPhaseMatch)
 
     # Bandwidths
     bandwidths = Dict(
-        "omega_L" => ustrip.(u"Hz*m", ncpm.bw_data.omega_L_bw),
+        "omega_L" => collect(ustrip.(u"Hz*m", ncpm.bw_data.omega_L_bw)),
         "temp_L" => ustrip(u"K*m", ncpm.bw_data.temp_L_bw),
         "theta_L" => ustrip(u"rad*m", ncpm.bw_data.theta_L_bw),
         "phi_L" => ustrip(u"rad*m", ncpm.bw_data.phi_L_bw)
@@ -264,7 +264,19 @@ function to_yaml(io::IO, ncpm::NoncollinearPhaseMatch)
         "S0_L2_no_miller" => ustrip(u"W", ncpm.eff_data.S0_Lsquared_no_miller)
     )
 
-    # Top-level dict
+    # Taylor expansion
+    taylor_tpo = [taylor_theta_phi_omega(hi_or_lo, theta_ncpm, phi_ncpm, ncpm.cr, lambda, ncpm.temp) for (hi_or_lo, theta_ncpm, phi_ncpm, lambda) in zip(ncpm.hi_or_lo_rrb, ncpm.theta_pm_rrb, ncpm.phi_pm_rrb, ncpm.lambda_rrb)]
+    center_rrb = [t[1] for t in taylor_tpo]
+    grad_rrb = [t[2] for t in taylor_tpo]
+    hess_rrb = [t[3] for t in taylor_tpo]
+    
+    taylor_deriv_theta_phi_omega = Dict(
+        "center_rrb" => center_rrb,
+        "grad_rrb" => grad_rrb,
+        "hess_rrb" => hess_rrb,
+    )
+
+    # Top-level dictionary
     data = Dict(
         "crystal" => ncpm.cr.metadata[:description],
         "temperature" => temperature,
@@ -276,7 +288,8 @@ function to_yaml(io::IO, ncpm::NoncollinearPhaseMatch)
         "beta2" => beta2,
         "beta3" => beta3,
         "bandwidths" => bandwidths,
-        "efficiency" => efficiency
+        "efficiency" => efficiency,
+        "n_taylor_theta_phi_omega" => taylor_deriv_theta_phi_omega
     )
 
     # Polarization
@@ -305,7 +318,6 @@ function to_yaml(io::IO, ncpm::NoncollinearPhaseMatch)
 
     YAML.write(io, data)
 end
-
 
 
 function delta_k_noncollinear(

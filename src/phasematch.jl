@@ -288,7 +288,7 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
 
     # Header
     @printf(io, "%-29s %s\n", "Crystal:", cpm.cr.metadata[:description])
-    @printf(io, "%-29s θ: %3.2f°, ϕ: %3.2f°\n", "k angles:",
+    @printf(io, "%-29s θ: %3.2f°, ϕ: %3.2f°\n", "k angle:",
         ustrip(u"°", cpm.theta_pm), ustrip(u"°", cpm.phi_pm))
     @printf(io, "%-29s %-25s\n", "k direction:", vec_str(angles_to_vector(cpm.theta_pm, cpm.phi_pm)))
     @printf(io, "%-29s %3.2f K (%3.2f °C)\n", "Temperature:",
@@ -368,36 +368,20 @@ function Base.show(io::IO, cpm::CollinearPhaseMatch)
     println(io, "────────────────────────────────────────────────────────────────────────────────────────────────────────")
 end
 function to_yaml(io::IO, cpm::CollinearPhaseMatch)
-    # Temperature and wavelength
-    temperature = ustrip(u"K", cpm.temp)
-    wavelength = ustrip.(u"m", cpm.lambda_rrb)                      # m
+    # Scalars
+    temperature = ustrip(u"K", cpm.temp)                            # K
 
-    # Angles
-    theta = ustrip(u"rad", cpm.theta_pm)
-    phi = ustrip(u"rad", cpm.phi_pm)
-
-    # k direction
-    k_direction = collect(angles_to_vector(cpm.theta_pm, cpm.phi_pm))
-
-    # S, E, D directions
-    S_direction = [collect(cpm.S_dir_rrb[i]) for i in 1:3]
-    E_direction = [collect(cpm.E_dir_rrb[i]) for i in 1:3]
-    D_direction = [collect(cpm.D_dir_rrb[i]) for i in 1:3]
-
-    # Indices
-    refractive_index = cpm.n_rrb
-    group_index = cpm.group_index_rrb
-
-    # Walkoff
-    walkoff_angle = ustrip.(u"rad", cpm.walkoff_angle_rrb)
-
-    # Dispersion
-    beta2 = ustrip.(u"s^2/m", cpm.beta2_rrb)
-    beta3 = ustrip.(u"s^3/m", cpm.beta3_rrb)
+    # Convert tuples to vectors explicitly
+    wavelength = collect(ustrip.(u"m", cpm.lambda_rrb))             # m
+    group_index = collect(cpm.group_index_rrb)
+    refractive_index = collect(cpm.n_rrb)
+    walkoff_angle = collect(ustrip.(u"rad", cpm.walkoff_angle_rrb)) # rad
+    beta2 = collect(ustrip.(u"s^2/m", cpm.beta2_rrb))               # s²/m
+    beta3 = collect(ustrip.(u"s^3/m", cpm.beta3_rrb))               # s³/m
 
     # Bandwidths
     bandwidths = Dict(
-        "omega_L" => ustrip.(u"Hz*m", cpm.bw_data.omega_L_bw),
+        "omega_L" => collect(ustrip.(u"Hz*m", cpm.bw_data.omega_L_bw)),
         "temp_L" => ustrip(u"K*m", cpm.bw_data.temp_L_bw),
         "theta_L" => ustrip(u"rad*m", cpm.bw_data.theta_L_bw),
         "phi_L" => ustrip(u"rad*m", cpm.bw_data.phi_L_bw)
@@ -411,16 +395,35 @@ function to_yaml(io::IO, cpm::CollinearPhaseMatch)
         "S0_L2_no_miller" => ustrip(u"W", cpm.eff_data.S0_Lsquared_no_miller)
     )
 
-    # Geometry block
+    # Angles and directions
+    theta = ustrip(u"rad", cpm.theta_pm)
+    phi = ustrip(u"rad", cpm.phi_pm)
+    k_direction = collect(angles_to_vector(cpm.theta_pm, cpm.phi_pm))
+    S_direction = [collect(cpm.S_dir_rrb[i]) for i in 1:3]
+    E_direction = [collect(cpm.E_dir_rrb[i]) for i in 1:3]
+    D_direction = [collect(cpm.D_dir_rrb[i]) for i in 1:3]
+
     geometry = Dict(
-        "angles" => Dict("theta" => theta, "phi" => phi),  # rad
+        "k_angle" => Dict("theta" => theta, "phi" => phi),
         "k_direction" => k_direction,
         "S_direction" => S_direction,
         "E_direction" => E_direction,
         "D_direction" => D_direction
     )
 
-    # Top-level YAML structure
+    # Taylor expansion
+    taylor_tpo = [taylor_theta_phi_omega(hi_or_lo, cpm.theta_pm, cpm.phi_pm, cpm.cr, lambda, cpm.temp) for (hi_or_lo, lambda) in zip(cpm.hi_or_lo_rrb, cpm.lambda_rrb)]
+    center_rrb = [t[1] for t in taylor_tpo]
+    grad_rrb = [t[2] for t in taylor_tpo]
+    hess_rrb = [t[3] for t in taylor_tpo]
+    
+    taylor_deriv_theta_phi_omega = Dict(
+        "center_rrb" => center_rrb,
+        "grad_rrb" => grad_rrb,
+        "hess_rrb" => hess_rrb,
+    )
+
+    # YAML structure
     data = Dict(
         "crystal" => cpm.cr.metadata[:description],
         "temperature" => temperature,
@@ -432,7 +435,8 @@ function to_yaml(io::IO, cpm::CollinearPhaseMatch)
         "beta2" => beta2,
         "beta3" => beta3,
         "bandwidths" => bandwidths,
-        "efficiency" => efficiency
+        "efficiency" => efficiency,
+        "n_taylor_theta_phi_omega" => taylor_deriv_theta_phi_omega,
     )
 
     # Polarization

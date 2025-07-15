@@ -1,4 +1,4 @@
-export NonlinearCrystal, UnidirectionalCrystal, BidirectionalCrystal, default_lambda, default_temp, is_lambda_valid, valid_lambda_range, optical_axis_angle, RefractionDataHiLo, RefractionData, plot_birefringent_refraction, default_temp
+export NonlinearCrystal, UnidirectionalCrystal, BidirectionalCrystal, default_lambda, default_temp, is_lambda_valid, valid_lambda_range, optical_axis_angle, RefractionDataHiLo, RefractionData, taylor_theta_phi_omega, plot_birefringent_refraction, default_temp
 
 abstract type NonlinearCrystal end
 
@@ -643,6 +643,26 @@ function calc_E_dir_S_dir(
 
     return E_dir_hi_lo, S_dir_hi_lo
 end
+
+function taylor_theta_phi_omega(hi_or_lo::Symbol, theta::Angle, phi::Angle, cr::NonlinearCrystal, lambda::Length=default_lambda(cr), temp::Temperature=default_temp(cr))
+    ω_in = 2π * c_0 / lambda
+    @show [ustrip(theta |> u"rad"), ustrip(phi |> u"rad"), ustrip(ω_in |> u"s^-1")]
+     
+
+    fun = x -> calc_n_hi_lo(x[1] * u"rad", x[2] * u"rad", cr, uconvert(u"m", 2π * c_0 / x[3] * 1u"s"); temp)[hi_or_lo === :hi ? 1 : 2]
+    center = fun([ustrip(theta |> u"rad"), ustrip(phi |> u"rad"), ustrip(ω_in |> u"s^-1")])
+    grad = ForwardDiff.gradient(
+            fun,
+            [ustrip(theta |> u"rad"), ustrip(phi |> u"rad"), ustrip(ω_in |> u"s^-1")],
+        )# * 1u"s/m")
+    hess = ForwardDiff.hessian(
+            fun,
+            [ustrip(theta |> u"rad"), ustrip(phi |> u"rad"), ustrip(ω_in |> u"s^-1")],
+        )# * 1u"s/m")
+
+    return center, grad, hess
+end
+taylor_theta_phi_omega(theta::Angle, cr::UnidirectionalCrystal, args...; kwargs...) = taylor_theta_phi_omega(theta, 0.0u"rad", cr, args...; kwargs...)
 
 # β0 = k
 function calc_β0_hi_lo(theta::Angle, phi::Angle, cr::NonlinearCrystal, lambda::Length=default_lambda(cr), temp::Temperature=default_temp(cr))

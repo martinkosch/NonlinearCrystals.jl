@@ -1,4 +1,4 @@
-export PhaseMatch, CollinearPhaseMatch, pm_wavelengths, find_all_pms_along_dimension, find_all_ncpm_over_temp, find_all_ncpm_over_lambda, find_nearest_pm_along_lambda_r_b, find_nearest_pm_along_theta_phi, delta_k
+export PhaseMatch, CollinearPhaseMatch, pm_wavelengths, find_all_pms_along_dimension, find_all_ncpm_over_temp, find_all_ncpm_over_lambda, find_nearest_pm_along_lambda_r_b, find_nearest_pm_along_theta_phi, delta_k, external_ray_dirs
 
 """
     PMRefractionData
@@ -466,6 +466,46 @@ function to_yaml(io::IO, cpm::CollinearPhaseMatch)
     YAML.write(io, data)
 end
 
+
+"""
+    external_ray_dirs(theta_cut, phi_cut, pm; n_external_rrb=(1.0, 1.0, 1.0))
+
+Given the cut orientation (`theta_cut`, `phi_cut`) of a birefringent crystal and a collinear phasematching configuration `pm`, compute the external propagation directions of the three interacting waves after refraction at the crystal surface.
+
+Refraction is computed using Snell's law for each wave individually, taking into account its internal refractive index (`n_internal_rrb`) and a user-specified external refractive index tuple (`n_external_rrb`), e.g., `(1.0, 1.0, 1.0)` for air.
+Returns a tuple of three unit vectors representing the external directions of the waves. If total internal reflection occurs for any wave, `nothing` is returned in its place.
+"""
+
+function external_ray_dirs(
+    theta_cut::Angle, 
+    phi_cut::Angle, 
+    pm::CollinearPhaseMatch; 
+    n_external_rrb::NTuple{3,<:Real}=(1.0, 1.0, 1.0)
+)
+    k_dir_internal = angles_to_vector(pm.theta_pm, pm.phi_pm)
+    n_dir_cut = angles_to_vector(theta_cut, phi_cut)
+    n_internal_rrb = pm.refr_data.n_rrb
+
+    k_dir_external_rrb = map(zip(n_internal_rrb, n_external_rrb)) do (n_i, n_e)
+        # Tangential component
+        k_tan = k_dir_internal - dot(k_dir_internal, n_dir_cut) * n_dir_cut
+        sin_theta_i = norm(k_tan)
+
+        # Snell's law
+        sin_theta_e = (n_i / n_e) * sin_theta_i
+
+        if sin_theta_e > 1
+            return nothing  # Total internal reflection
+        end
+
+        k_tan_ext = (n_e / n_i) * k_tan
+        k_n_ext = sqrt(1 - norm(k_tan_ext)^2)
+        k_ext = normalize(k_tan_ext + k_n_ext * n_dir_cut)
+        return k_ext
+    end
+
+    return Tuple(k_dir_external_rrb)
+end
 
 """
     pm_wavelengths(; lambda_r1=nothing, lambda_r2=nothing, lambda_b=nothing)

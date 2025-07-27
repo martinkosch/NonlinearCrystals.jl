@@ -399,7 +399,7 @@ function external_ray_dirs(
             return nothing  # Total internal reflection
         end
 
-        k_tan_ext = (n_e / n_i) * k_tan
+        k_tan_ext = (n_i / n_e) * k_tan
         k_n_ext = sqrt(1 - norm(k_tan_ext)^2)
         k_ext = normalize(k_tan_ext + k_n_ext * n_dir_cut)
         return k_ext

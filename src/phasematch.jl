@@ -1,4 +1,4 @@
-export PhaseMatch, CollinearPhaseMatch, pm_wavelengths, find_all_pms_along_dimension, find_all_ncpm_over_temp, find_all_ncpm_over_lambda, find_nearest_pm_along_lambda_r_b, find_nearest_pm_along_theta_phi, delta_k
+export PhaseMatch, CollinearPhaseMatch, pm_wavelengths, find_all_pms_along_dimension, find_all_ncpm_over_temp, find_all_ncpm_over_lambda, find_nearest_pm_along_lambda_r_b, find_nearest_pm_along_theta_phi, delta_k, external_ray_dirs
 
 """
     PMRefractionData
